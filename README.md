@@ -20,7 +20,7 @@ Repository ini dibuat untuk mempersiapkan keikutsertaan dalam ajang **National A
 ## Poin-Poin Penting
 
 ### Kategori Lomba yang Diikuti
-- **AI Web Applications**: Pengembangan platform/aplikasi web cerdas yang mengintegrasikan model *machine learning*, *computer vision*, atau agen AI interaktif[cite: 4]. Proyek ini memanfaatkan *Computer Vision* (OpenCV) yang dibungkus dengan antarmuka web interaktif untuk sistem absensi digital.
+- **AI Web Applications**: Pengembangan platform/aplikasi web cerdas yang mengintegrasikan model *machine learning*, *computer vision*, atau agen AI interaktif. Proyek ini memanfaatkan *Computer Vision* (OpenCV) yang dibungkus dengan antarmuka web interaktif untuk sistem absensi digital.
 
 ### Timeline Lomba
 | Tahapan | Tanggal / Waktu | Status |
