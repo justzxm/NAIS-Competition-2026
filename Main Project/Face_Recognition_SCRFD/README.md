@@ -37,14 +37,14 @@ Semua pengaturan (threshold, ukuran wajah minimum, durasi alarm, dll.) ada di `s
 
 | Jarak | Terdeteksi? | Lebar kotak (px) | Dikenali? | Skor | FPS |
 |---|---|---|---|---|---|
-| 1 m | ... | ... | ... | ... | ... |
+| 1 m | Ya | 100+ | Ya | 65-70 | 16-20+ |
 | 3 m | ... | ... | ... | ... | ... |
 | 5 m | ... | ... | ... | ... | ... |
 
 | Pengujian | Jumlah orang | Hasil |
 |---|---|---|
 | Penolakan orang asing | ... | skor maksimum ..., THRESHOLD = ... |
-| Pengenalan orang terdaftar | ... | skor persentil 5 = ... |
+| Pengenalan orang terdaftar | 1 | skor persentil 5 = 0.54 |
 
 Jumlah penguji kecil, jadi hasil bersifat indikatif, bukan angka akurasi statistik.
 
@@ -62,6 +62,3 @@ dan diuji sudah memberi izin. Folder `data/` tidak diunggah ke repo.
 |---|---|---|
 | InsightFace `buffalo_sc`: SCRFD (`det_500m`) dan ArcFace-MBF (`w600k_mbf`) | Deteksi dan pengenalan wajah | Kode MIT; model hanya untuk riset non-komersial |
 | OpenCV, NumPy, ONNX Runtime | Pendukung | Lisensi terbuka |
-
-Pemakaian model pihak ketiga dalam lomba ini sudah disetujui pembina. Model non-komersial
-tidak boleh dipakai untuk produk komersial tanpa lisensi tambahan.
