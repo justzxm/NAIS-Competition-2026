@@ -28,7 +28,7 @@ PROSES_SETIAP = 1            # pengenalan dijalankan tiap N frame (naikkan jika 
 
 # ---- kestabilan saat orang bergerak ----
 YAW_MIN = 0.4                # rasio hidung terhadap mata; di luar YAW_MIN..YAW_MAX dianggap menoleh
-YAW_MAX = 2.5
+YAW_MAX = 4
 RIWAYAT = 7                  # jumlah hasil terakhir yang dipakai untuk memilih nama
 RIWAYAT_MIN = 4              # minimal hasil terkumpul sebelum keputusan diambil
 IOU_TRACK = 0.15             # kemiripan kotak antar frame agar dianggap wajah yang sama
