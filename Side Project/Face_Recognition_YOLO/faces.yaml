@@ -1,7 +1,0 @@
-path: D:/Python/Project_AI/Face_Detection_YOLO/dataset
-
-train: images/train
-val: images/val
-
-names:
-  0: face
