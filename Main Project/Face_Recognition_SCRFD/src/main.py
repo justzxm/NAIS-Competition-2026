@@ -110,7 +110,7 @@ def main():
                     if hitung_nama[nama] == config.FRAME_KONFIRMASI:
                         if attendance.catat(nama):
                             pesan, waktu_pesan = f"Absen tercatat: {nama}", time.time()
-
+                            alarm.umumkan_absen(nama)
                 # alarm: Unknown harus terlihat terus-menerus selama DURASI_UNKNOWN detik
                 if ada_unknown:
                     if unknown_sejak is None:

@@ -1,6 +1,5 @@
+models/
 __pycache__/
 *.pyc
-
-data/*
-!data/.gitkeep
-
+data/
+Side Project/Face_Recognition_YOLO/
