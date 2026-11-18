@@ -57,3 +57,14 @@ ULANG_ALARM = 3
 SUARA_MAC_ABSEN = "Glass"
 SUARA_MAC_ALARM = "Sosumi"
 JEDA_AWAL_MS = 250            # keheningan sebelum nada; naikkan (300-500) kalau awal nada masih hilang
+
+# ---- catatan peringatan orang asing ----
+PATH_PERINGATAN = os.path.join(DIR_DATA, "peringatan.csv")
+
+# ---- Telegram ----
+PATH_ENV = os.path.join(BASE, ".env")
+TELEGRAM_AKTIF = True            # False untuk mematikan semua pengiriman
+TELEGRAM_KIRIM_ABSEN = True
+TELEGRAM_KIRIM_ASING = True
+JEDA_NOTIF_ASING = 60            # detik antar notifikasi orang asing, agar tidak membanjiri chat
+TELEGRAM_TIMEOUT = 8             # detik menunggu jawaban server

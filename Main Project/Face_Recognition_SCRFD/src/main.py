@@ -3,6 +3,7 @@ import cv2
 import config
 import attendance
 import alarm
+import notifikasi
 from camera import Kamera
 from detect import Detektor, potong_wajah, ketajaman, hadap_depan
 from recognize import Pengenal, Pelacak
@@ -111,6 +112,7 @@ def main():
                         if attendance.catat(nama):
                             pesan, waktu_pesan = f"Absen tercatat: {nama}", time.time()
                             alarm.umumkan_absen(nama)
+                            notifikasi.kirim_absen(nama)
                 # alarm: Unknown harus terlihat terus-menerus selama DURASI_UNKNOWN detik
                 if ada_unknown:
                     if unknown_sejak is None:
@@ -122,6 +124,8 @@ def main():
                 if unknown_sejak is not None and t_proses - unknown_sejak >= config.DURASI_UNKNOWN:
                     if alarm.bunyikan():
                         pesan, waktu_pesan = "PERINGATAN: orang tidak dikenal!", time.time()
+                        attendance.catat_asing()
+                        notifikasi.kirim_asing()
 
             nomor += 1
 
