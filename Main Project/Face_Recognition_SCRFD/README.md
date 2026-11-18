@@ -123,7 +123,7 @@ Warna kotak di layar: hijau berarti dikenali, merah berarti Unknown, kuning bera
    TELEGRAM_TOKEN=token_dari_BotFather
    TELEGRAM_CHAT_ID=id_grup
    ```
-4. Cari chat ID dengan `python src/cari_chat_id.py`, uji dengan `python src/uji_telegram.py`.
+4. Cari chat ID dengan `python src/cari_chat_id.py`.
 5. Kirim rekap CSV kapan saja dengan `python src/kirim_csv.py` (opsi `hari_ini` untuk data hari ini).
 
 File `.env` sudah diabaikan Git. **Jangan pernah mengunggah token.** Kalau token bocor, kirim
