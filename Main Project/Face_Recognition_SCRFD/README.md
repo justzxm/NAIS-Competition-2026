@@ -132,7 +132,7 @@ File `.env` sudah diabaikan Git. **Jangan pernah mengunggah token.** Kalau token
 | Pengenalan orang terdaftar | 1 | skor persentil 5 = 0.54 |
 | Penolakan orang asing | 1 | rata-rata 0.19, persentil 95 = 0.36, maksimum 0.57 |
 
-`THRESHOLD` yang dipakai: ... (isi dengan nilai final di `config.py`).
+`THRESHOLD` yang dipakai: 0.4
 
 | Jarak | Terdeteksi? | Lebar kotak (px) | Dikenali? | Skor | FPS |
 |---|---|---|---|---|---|
