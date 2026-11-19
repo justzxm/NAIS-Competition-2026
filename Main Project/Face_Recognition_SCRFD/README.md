@@ -36,7 +36,6 @@ Kamera -> deteksi wajah (SCRFD) -> embedding wajah (ArcFace, wajah diluruskan ot
 Face_Recognition_SCRFD/
 ├── README.md
 ├── requirements.txt
-├── unduh_model.py             mengunduh model InsightFace buffalo_sc
 ├── .env.contoh                contoh pengaturan Telegram (salin menjadi .env)
 ├── models/                    model (tidak ikut repo)
 ├── data/                      database wajah, absensi, peringatan (tidak ikut repo)
