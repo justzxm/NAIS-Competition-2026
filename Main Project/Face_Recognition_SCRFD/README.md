@@ -76,10 +76,7 @@ pip install -r requirements.txt
 Jalankan juga `Install Certificates.command` (folder Applications, Python 3.x) sekali setelah
 memasang Python dari python.org.
 
-Skrip pemasang membuat lingkungan virtual `.venv`, memasang library dari `requirements.txt`,
-dan mengunduh model ke `models/buffalo_sc/`. Semua terpasang di dalam folder project.
-Kalau model gagal diunduh, unduh manual dari
-`https://github.com/deepinsight/insightface/releases/download/model-zoo/buffalo_sc.zip`,
+Unduh model dari `https://github.com/deepinsight/insightface/releases/download/model-zoo/buffalo_sc.zip`,
 lalu taruh `det_500m.onnx` dan `w600k_mbf.onnx` langsung di `models/buffalo_sc/`.
 
 ## Cara memakai
@@ -87,13 +84,13 @@ lalu taruh `det_500m.onnx` dan `w600k_mbf.onnx` langsung di `models/buffalo_sc/`
 1. Daftarkan wajah (tekan `S` untuk menyimpan, `Q` untuk selesai; ambil 6-8 foto dengan sudut
    dan cahaya sedikit berbeda):
    ```
-   .venv\Scripts\python src\register.py      (Windows)
-   .venv/bin/python src/register.py          (macOS)
+   src\register.py        (Windows)
+   src/register.py          (macOS)
    ```
 2. Jalankan sistem (tekan `Q` untuk keluar):
    ```
-   .venv\Scripts\python src\main.py          (Windows)
-   .venv/bin/python src/main.py              (macOS)
+   src\main.py            (Windows)
+   src/main.py              (macOS)
    ```
 
 Warna kotak di layar: hijau berarti dikenali, merah berarti Unknown, kuning berarti belum diproses
@@ -175,9 +172,6 @@ tumpang tindih; ArcFace memisahkan sebagian besar pengukuran dengan jelas.
 | InsightFace `buffalo_sc`: SCRFD (`det_500m`) dan ArcFace-MBF (`w600k_mbf`) | Deteksi dan pengenalan wajah | Kode MIT; model hanya untuk riset non-komersial |
 | OpenCV, NumPy, ONNX Runtime | Pengolahan gambar dan menjalankan model | Lisensi terbuka |
 | Telegram Bot API | Notifikasi | Ketentuan layanan Telegram |
-
-Pemakaian model pihak ketiga dalam lomba ini disetujui pembina. Model non-komersial tidak boleh
-dipakai untuk produk komersial tanpa lisensi tambahan.
 
 ## Pemecahan masalah
 
