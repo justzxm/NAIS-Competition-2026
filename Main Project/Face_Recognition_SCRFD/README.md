@@ -64,14 +64,14 @@ Gunakan Python 3.14. Di Mac Intel, gunakan Python 3.12 atau 3.13, karena versi b
 ```
 git clone <alamat-repo>
 cd "<nama-repo>\Main Project\Face_Recognition_SCRFD"
-pasang.bat
+pip install -r requirements.txt
 ```
 
 ### macOS
 ```
 git clone <alamat-repo>
 cd "<nama-repo>/Main Project/Face_Recognition_SCRFD"
-bash pasang.sh
+pip install -r requirements.txt
 ```
 Jalankan juga `Install Certificates.command` (folder Applications, Python 3.x) sekali setelah
 memasang Python dari python.org.
