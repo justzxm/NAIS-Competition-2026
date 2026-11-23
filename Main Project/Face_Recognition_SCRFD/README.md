@@ -4,7 +4,7 @@ Sistem real-time yang mengenali wajah orang yang sudah terdaftar, mencatat kehad
 secara otomatis, dan membunyikan peringatan ketika ada orang yang tidak dikenal.
 Hasilnya juga dikirim sebagai notifikasi ke grup Telegram.
 
-Dibuat untuk NAIS Competition 2026 oleh [nama tim], [asal sekolah].
+Dibuat untuk NAIS Competition 2026 oleh tim SMK Negeri 3 Singaraja.
 
 ## Contoh penggunaan
 - **Sekolah dan kampus:** absensi siswa atau mahasiswa di pintu kelas atau gerbang, dan
@@ -62,15 +62,15 @@ Gunakan Python 3.14. Di Mac Intel, gunakan Python 3.12 atau 3.13, karena versi b
 
 ### Windows
 ```
-git clone <alamat-repo>
-cd "<nama-repo>\Main Project\Face_Recognition_SCRFD"
+git clone https://github.com/justzxm/NAIS-Competition-2026.git
+cd "NAIS-Competition-2026\Main Project\Face_Recognition_SCRFD"
 pip install -r requirements.txt
 ```
 
 ### macOS
 ```
-git clone <alamat-repo>
-cd "<nama-repo>/Main Project/Face_Recognition_SCRFD"
+git clone https://github.com/justzxm/NAIS-Competition-2026.git
+cd "NAIS-Competition-2026/Main Project/Face_Recognition_SCRFD"
 pip install -r requirements.txt
 ```
 Jalankan juga `Install Certificates.command` (folder Applications, Python 3.x) sekali setelah
