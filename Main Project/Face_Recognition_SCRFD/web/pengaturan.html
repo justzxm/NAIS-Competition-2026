@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pengaturan & Info — Face Recognition</title>
+  <style>
+    :root {
+      --bg: #f1f5f9;
+      --surface: #ffffff;
+      --surface-2: #f8fafc;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --accent: #2563eb;
+      --accent-soft: #eff6ff;
+      --radius-lg: 18px;
+      --radius-sm: 9px;
+      --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.04);
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 22px 18px 48px; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+    .app { max-width: 980px; margin: 0 auto; }
+
+    .topbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; padding: 15px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+    .topbar-left { display: flex; align-items: center; gap: 14px; }
+    .burger-btn { width: 40px; height: 40px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface-2); display: inline-flex; flex-direction: column; justify-content: center; align-items: center; gap: 4.5px; cursor: pointer; }
+    .burger-btn span { width: 16px; height: 1.8px; background: var(--text); border-radius: 2px; }
+    .brand h1 { margin: 0; font-size: 18.5px; font-weight: 700; }
+    .brand p { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
+
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow-sm); }
+    .card h2 { margin: 0 0 14px; font-size: 15.5px; font-weight: 650; }
+
+    .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+    .row:last-child { border-bottom: none; }
+    .row span { color: var(--muted); }
+    .row strong { color: var(--text); }
+
+    .select { padding: 7px 10px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface); font-size: 13px; }
+    .btn { padding: 8px 13px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font-size: 12.5px; font-weight: 600; text-decoration: none; cursor: pointer; }
+
+    .drawer-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.36); z-index: 60; opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
+    .drawer-backdrop.is-open { opacity: 1; pointer-events: auto; }
+    .drawer { position: fixed; top: 0; left: 0; bottom: 0; width: 310px; max-width: 88vw; background: var(--surface); border-right: 1px solid var(--border); z-index: 70; transform: translateX(-100%); transition: transform 0.22s ease; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+    .drawer.is-open { transform: translateX(0); }
+    .drawer-head { display: flex; justify-content: space-between; align-items: center; }
+    .drawer-head h2 { margin: 0; font-size: 16px; }
+    .nav-stack { display: flex; flex-direction: column; gap: 8px; }
+    .nav-link { padding: 10px 12px; border-radius: var(--radius-sm); text-decoration: none; color: var(--text); font-size: 13.5px; font-weight: 600; background: var(--surface-2); border: 1px solid var(--border); }
+    .nav-link.is-here { background: var(--accent-soft); border-color: #bfdbfe; color: #1e40af; }
+
+    @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div id="drawer-backdrop" class="drawer-backdrop" onclick="toggleDrawer(false)"></div>
+  <aside id="nav-drawer" class="drawer">
+    <div class="drawer-head">
+      <h2>Halaman</h2>
+      <button type="button" class="btn" onclick="toggleDrawer(false)">Tutup</button>
+    </div>
+    <nav class="nav-stack">
+      <a class="nav-link" href="/">Kamera &amp; Registrasi</a>
+      <a class="nav-link" href="/uji">Uji Skor &amp; Grafik</a>
+      <a class="nav-link" href="/log">Log Kehadiran &amp; CSV</a>
+      <a class="nav-link is-here" href="/pengaturan">Pengaturan &amp; Info</a>
+    </nav>
+  </aside>
+
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button type="button" class="burger-btn" aria-label="Buka menu" onclick="toggleDrawer(true)">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="brand">
+          <h1>Pengaturan &amp; Informasi Sistem</h1>
+          <p>Preferensi browser dan ringkasan parameter aktif dari config.py</p>
+        </div>
+      </div>
+      <a class="btn" href="/">Kembali ke Kamera</a>
+    </header>
+
+    <main class="grid">
+      <section class="card">
+        <h2>Preferensi Tampilan Browser</h2>
+        <div class="row">
+          <span>Interval Refresh Frame</span>
+          <select id="pref-interval" class="select" onchange="savePrefs()">
+            <option value="120">Cepat (120 ms)</option>
+            <option value="160">Normal (160 ms)</option>
+            <option value="260">Hemat CPU (260 ms)</option>
+          </select>
+        </div>
+        <div class="row">
+          <span>Tampilkan Panduan Registrasi</span>
+          <input id="pref-guide" type="checkbox" onchange="savePrefs()" />
+        </div>
+        <div class="row">
+          <span>Status Penyimpanan</span>
+          <strong id="pref-saved">Tersimpan otomatis</strong>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Konfigurasi Aktif (config.py)</h2>
+        <div id="cfg-list">
+          <div class="row"><span>Memuat konfigurasi...</span><strong>-</strong></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    function toggleDrawer(open) {
+      const d = document.getElementById("nav-drawer");
+      const b = document.getElementById("drawer-backdrop");
+      const next = typeof open === "boolean" ? open : !d.classList.contains("is-open");
+      d.classList.toggle("is-open", next);
+      b.classList.toggle("is-open", next);
+    }
+
+    function loadPrefs() {
+      document.getElementById("pref-interval").value = localStorage.getItem("ui_frame_ms") || "160";
+      document.getElementById("pref-guide").checked = localStorage.getItem("ui_show_guide") !== "false";
+    }
+
+    function savePrefs() {
+      localStorage.setItem("ui_frame_ms", document.getElementById("pref-interval").value);
+      localStorage.setItem("ui_show_guide", String(document.getElementById("pref-guide").checked));
+      document.getElementById("pref-saved").textContent = "Tersimpan (" + new Date().toLocaleTimeString() + ")";
+    }
+
+    async function muatInfo() {
+      const res = await fetch("/api/info-konfig");
+      if (!res.ok) return;
+      const c = await res.json();
+      const items = [
+        ["Kamera / Resolusi", `${c.kamera_id} (${c.resolusi})`],
+        ["DET_SIZE SCRFD", `${c.det_size[0]}x${c.det_size[1]}`],
+        ["THRESHOLD", c.threshold],
+        ["UKURAN_WAJAH_MIN", `${c.ukuran_wajah_min} px`],
+        ["TAJAM_MIN", c.tajam_min],
+        ["Anti-Spoofing Kedipan", c.liveness_aktif ? `Aktif (min ${c.liveness_kedip_min}x / ${c.liveness_jendela}s)` : "Nonaktif"],
+        ["SPOOF_DETIK", `${c.spoof_detik} detik`],
+        ["Notifikasi Telegram", c.telegram_aktif ? "Aktif" : "Nonaktif"]
+      ];
+      document.getElementById("cfg-list").innerHTML = items
+        .map(([k, v]) => `<div class="row"><span>${k}</span><strong>${v}</strong></div>`)
+        .join("");
+    }
+
+    loadPrefs();
+    muatInfo();
+  </script>
+</body>
+</html>
