@@ -6,3 +6,5 @@ models/*
 
 __pycache__/
 *.pyc
+
+Side Project/*
