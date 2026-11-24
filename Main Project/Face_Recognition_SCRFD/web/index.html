@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Panel Lokal — Absensi & Keamanan Wajah</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background: #f3f4f6;
+      color: #111827;
+    }
+    h1 { font-size: 22px; margin-bottom: 16px; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1.35fr 1fr;
+      gap: 18px;
+      align-items: start;
+    }
+    .card {
+      background: #ffffff;
+      border-radius: 10px;
+      padding: 16px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+      margin-bottom: 16px;
+    }
+    h2 { font-size: 17px; margin: 0 0 12px 0; }
+    .controls {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    button {
+      padding: 9px 14px;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      background: #2563eb;
+      color: #ffffff;
+    }
+    button.secondary { background: #4b5563; }
+    button.danger { background: #dc2626; }
+    button.success { background: #059669; }
+    input[type="text"] {
+      flex: 1;
+      min-width: 180px;
+      padding: 9px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+    }
+    #camera-view {
+      width: 100%;
+      max-height: 430px;
+      object-fit: contain;
+      background: #111827;
+      border-radius: 8px;
+      display: block;
+    }
+    .status {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #374151;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th, td {
+      border-bottom: 1px solid #e5e7eb;
+      padding: 7px 8px;
+      text-align: left;
+    }
+    th { background: #f9fafb; }
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Sistem Absensi & Pemantauan Keamanan (Lokal)</h1>
+
+  <div class="grid">
+    <div>
+      <div class="card">
+        <h2>Kamera & Mode Absensi</h2>
+        <div class="controls">
+          <button class="success" onclick="setMode('absensi')">Mulai Absensi & Keamanan</button>
+          <button class="danger" onclick="setMode('idle')">Hentikan Kamera</button>
+          <button class="secondary" onclick="kirimCsv(false)">Kirim Semua CSV</button>
+          <button class="secondary" onclick="kirimCsv(true)">Kirim CSV Hari Ini</button>
+        </div>
+        <img id="camera-view" src="" alt="Kamera tidak aktif" />
+        <div class="status" id="status-text">Status: Siap</div>
+      </div>
+
+      <div class="card">
+        <h2>Pendaftaran Wajah Baru</h2>
+        <form onsubmit="mulaiDaftar(event)">
+          <div class="controls">
+            <input type="text" id="nama-wajah" placeholder="Nama lengkap / ID" required />
+            <button type="submit">Daftar Wajah</button>
+          </div>
+        </form>
+        <div class="status" id="daftar-status">Masukkan nama lalu klik Daftar Wajah.</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <h2>Riwayat Kehadiran (absensi.csv)</h2>
+        <table>
+          <thead><tr><th>Nama</th><th>Waktu</th></tr></thead>
+          <tbody id="body-absensi"><tr><td colspan="2">Memuat...</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>Riwayat Peringatan (peringatan.csv)</h2>
+        <table>
+          <thead><tr><th>Waktu</th><th>Kejadian</th></tr></thead>
+          <tbody id="body-peringatan"><tr><td colspan="2">Memuat...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let timerFrame = null;
+
+    function setPesanStatus(teks) {
+      document.getElementById("status-text").textContent = "Status: " + teks;
+    }
+
+    function mulaiStream() {
+      if (timerFrame) clearInterval(timerFrame);
+      timerFrame = setInterval(() => {
+        document.getElementById("camera-view").src = "/api/frame?t=" + Date.now();
+      }, 150);
+    }
+
+    function hentikanStream() {
+      if (timerFrame) {
+        clearInterval(timerFrame);
+        timerFrame = null;
+      }
+      document.getElementById("camera-view").removeAttribute("src");
+    }
+
+    async function setMode(mode) {
+      try {
+        const res = await fetch("/api/mode", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mode })
+        });
+        const data = await res.json();
+        setPesanStatus(data.message || mode);
+        if (mode === "absensi") {
+          mulaiStream();
+        } else {
+          hentikanStream();
+        }
+      } catch (err) {
+        setPesanStatus("Error: " + err.message);
+      }
+    }
+
+    async function mulaiDaftar(e) {
+      e.preventDefault();
+      const nama = document.getElementById("nama-wajah").value.trim();
+      if (!nama) return;
+
+      const elStatus = document.getElementById("daftar-status");
+      elStatus.textContent = `Mengambil sampel wajah untuk "${nama}"...`;
+      mulaiStream();
+
+      try {
+        const res = await fetch("/api/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nama })
+        });
+        const data = await res.json();
+        elStatus.textContent = data.message || "Selesai.";
+        if (data.ok) {
+          document.getElementById("nama-wajah").value = "";
+        }
+      } catch (err) {
+        elStatus.textContent = "Gagal mendaftar: " + err.message;
+      }
+    }
+
+    async function kirimCsv(hariIni) {
+      try {
+        const res = await fetch("/api/kirim-csv", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ hari_ini: hariIni })
+        });
+        const data = await res.json();
+        setPesanStatus(data.message || "Terkirim.");
+      } catch (err) {
+        setPesanStatus("Gagal kirim CSV: " + err.message);
+      }
+    }
+
+    function isiTabel(tbodyId, rows, cols) {
+      const tbody = document.getElementById(tbodyId);
+      if (!rows || rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${cols.length}">Belum ada data</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = rows
+        .slice(-10)
+        .reverse()
+        .map(r => `<tr>${cols.map(c => `<td>${r[c] ?? ""}</td>`).join("")}</tr>`)
+        .join("");
+    }
+
+    async function muatCsv() {
+      try {
+        const [rAbs, rPer] = await Promise.all([
+          fetch("/api/absensi"),
+          fetch("/api/peringatan")
+        ]);
+        if (rAbs.ok) {
+          const dAbs = await rAbs.json();
+          isiTabel("body-absensi", dAbs.rows || [], ["nama", "waktu"]);
+        }
+        if (rPer.ok) {
+          const dPer = await rPer.json();
+          isiTabel("body-peringatan", dPer.rows || [], ["waktu", "kejadian"]);
+        }
+      } catch (_) {}
+    }
+
+    setInterval(muatCsv, 2500);
+    muatCsv();
+  </script>
+</body>
+</html>
