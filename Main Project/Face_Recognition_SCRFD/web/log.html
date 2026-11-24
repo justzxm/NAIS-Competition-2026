@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Log Kehadiran & CSV — Face Recognition</title>
+  <style>
+    :root {
+      --bg: #f1f5f9;
+      --surface: #ffffff;
+      --surface-2: #f8fafc;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --accent: #2563eb;
+      --accent-soft: #eff6ff;
+      --danger-soft: #fef2f2;
+      --warn-soft: #fffbeb;
+      --radius-lg: 18px;
+      --radius-md: 12px;
+      --radius-sm: 9px;
+      --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.04);
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 22px 18px 48px; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+    .app { max-width: 1240px; margin: 0 auto; }
+
+    .topbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; padding: 15px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+    .topbar-left { display: flex; align-items: center; gap: 14px; }
+    .burger-btn { width: 40px; height: 40px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface-2); display: inline-flex; flex-direction: column; justify-content: center; align-items: center; gap: 4.5px; cursor: pointer; }
+    .burger-btn span { width: 16px; height: 1.8px; background: var(--text); border-radius: 2px; }
+    .brand h1 { margin: 0; font-size: 18.5px; font-weight: 700; }
+    .brand p { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
+
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; box-shadow: var(--shadow-sm); }
+    .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .card-title { margin: 0; font-size: 15.5px; font-weight: 650; }
+    .card-meta { font-size: 12px; color: var(--muted); }
+
+    .btn { appearance: none; padding: 8px 13px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font-size: 12.5px; font-weight: 600; cursor: pointer; text-decoration: none; }
+    .btn:hover { background: #e2e8f0; }
+
+    .toolbar { display: flex; gap: 8px; margin-bottom: 10px; }
+    .input { flex: 1; padding: 8px 11px; font-size: 12.5px; border: 1px solid var(--border); border-radius: var(--radius-sm); outline: none; }
+    .input:focus { border-color: var(--accent); }
+
+    .table-box { border: 1px solid var(--border); border-radius: var(--radius-md); max-height: 420px; overflow: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { position: sticky; top: 0; background: var(--surface-2); color: var(--muted); font-size: 11.5px; text-transform: uppercase; }
+
+    .flag-spoof { font-size: 12px; font-weight: 600; color: #92400e; background: var(--warn-soft); padding: 2px 7px; border-radius: 5px; }
+    .flag-unknown { font-size: 12px; font-weight: 600; color: #991b1b; background: var(--danger-soft); padding: 2px 7px; border-radius: 5px; }
+
+    .drawer-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.36); z-index: 60; opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
+    .drawer-backdrop.is-open { opacity: 1; pointer-events: auto; }
+    .drawer { position: fixed; top: 0; left: 0; bottom: 0; width: 310px; max-width: 88vw; background: var(--surface); border-right: 1px solid var(--border); z-index: 70; transform: translateX(-100%); transition: transform 0.22s ease; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+    .drawer.is-open { transform: translateX(0); }
+    .drawer-head { display: flex; justify-content: space-between; align-items: center; }
+    .drawer-head h2 { margin: 0; font-size: 16px; }
+    .nav-stack { display: flex; flex-direction: column; gap: 8px; }
+    .nav-link { padding: 10px 12px; border-radius: var(--radius-sm); text-decoration: none; color: var(--text); font-size: 13.5px; font-weight: 600; background: var(--surface-2); border: 1px solid var(--border); }
+    .nav-link.is-here { background: var(--accent-soft); border-color: #bfdbfe; color: #1e40af; }
+
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div id="drawer-backdrop" class="drawer-backdrop" onclick="toggleDrawer(false)"></div>
+  <aside id="nav-drawer" class="drawer">
+    <div class="drawer-head">
+      <h2>Halaman</h2>
+      <button type="button" class="btn" onclick="toggleDrawer(false)">Tutup</button>
+    </div>
+    <nav class="nav-stack">
+      <a class="nav-link" href="/">Kamera &amp; Registrasi</a>
+      <a class="nav-link" href="/uji">Uji Skor &amp; Grafik</a>
+      <a class="nav-link is-here" href="/log">Log Kehadiran &amp; CSV</a>
+      <a class="nav-link" href="/pengaturan">Pengaturan &amp; Info</a>
+    </nav>
+  </aside>
+
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button type="button" class="burger-btn" aria-label="Buka menu" onclick="toggleDrawer(true)">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="brand">
+          <h1>Log Kehadiran &amp; Peringatan</h1>
+          <p id="kirim-status">Riwayat CSV lokal dan pengiriman rekap ke Telegram</p>
+        </div>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button type="button" class="btn" onclick="kirimCsv(true)">Kirim Hari Ini</button>
+        <button type="button" class="btn" onclick="kirimCsv(false)">Kirim Semua CSV</button>
+        <a class="btn" href="/">Kamera</a>
+      </div>
+    </header>
+
+    <main class="grid">
+      <section class="card">
+        <div class="card-head">
+          <h2 class="card-title">Log Kehadiran (absensi.csv)</h2>
+          <span id="count-abs" class="card-meta">0 baris</span>
+        </div>
+        <div class="toolbar">
+          <input type="text" id="q-abs" class="input" placeholder="Cari nama atau waktu..." oninput="renderAbs()" />
+          <button type="button" class="btn" onclick="muatLog()">Muat Ulang</button>
+        </div>
+        <div class="table-box">
+          <table>
+            <thead><tr><th>Nama</th><th>Waktu</th></tr></thead>
+            <tbody id="body-abs"><tr><td colspan="2" class="card-meta">Memuat...</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2 class="card-title">Log Peringatan (peringatan.csv)</h2>
+          <span id="count-per" class="card-meta">0 baris</span>
+        </div>
+        <div class="toolbar">
+          <input type="text" id="q-per" class="input" placeholder="Cari kejadian atau waktu..." oninput="renderPer()" />
+          <button type="button" class="btn" onclick="muatLog()">Muat Ulang</button>
+        </div>
+        <div class="table-box">
+          <table>
+            <thead><tr><th>Waktu</th><th>Kejadian</th></tr></thead>
+            <tbody id="body-per"><tr><td colspan="2" class="card-meta">Memuat...</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    let rowsAbs = [];
+    let rowsPer = [];
+
+    function toggleDrawer(open) {
+      const d = document.getElementById("nav-drawer");
+      const b = document.getElementById("drawer-backdrop");
+      const next = typeof open === "boolean" ? open : !d.classList.contains("is-open");
+      d.classList.toggle("is-open", next);
+      b.classList.toggle("is-open", next);
+    }
+
+    function fmtKejadian(v) {
+      const s = String(v ?? "");
+      if (s.startsWith("dugaan_spoofing")) return `<span class="flag-spoof">${s}</span>`;
+      if (s.includes("tidak_dikenal")) return `<span class="flag-unknown">${s}</span>`;
+      return s;
+    }
+
+    function renderAbs() {
+      const q = (document.getElementById("q-abs").value || "").toLowerCase().trim();
+      const f = rowsAbs.filter(r => (r.nama || "").toLowerCase().includes(q) || (r.waktu || "").toLowerCase().includes(q));
+      document.getElementById("count-abs").textContent = `${f.length} baris`;
+      const tb = document.getElementById("body-abs");
+      if (!f.length) { tb.innerHTML = `<tr><td colspan="2" class="card-meta">Tidak ada data</td></tr>`; return; }
+      tb.innerHTML = f.slice(-50).reverse().map(r => `<tr><td><strong>${r.nama ?? ""}</strong></td><td>${r.waktu ?? ""}</td></tr>`).join("");
+    }
+
+    function renderPer() {
+      const q = (document.getElementById("q-per").value || "").toLowerCase().trim();
+      const f = rowsPer.filter(r => (r.kejadian || "").toLowerCase().includes(q) || (r.waktu || "").toLowerCase().includes(q));
+      document.getElementById("count-per").textContent = `${f.length} baris`;
+      const tb = document.getElementById("body-per");
+      if (!f.length) { tb.innerHTML = `<tr><td colspan="2" class="card-meta">Tidak ada data</td></tr>`; return; }
+      tb.innerHTML = f.slice(-50).reverse().map(r => `<tr><td>${r.waktu ?? ""}</td><td>${fmtKejadian(r.kejadian)}</td></tr>`).join("");
+    }
+
+    async function muatLog() {
+      const [a, p] = await Promise.all([fetch("/api/absensi"), fetch("/api/peringatan")]);
+      if (a.ok) { rowsAbs = (await a.json()).rows || []; renderAbs(); }
+      if (p.ok) { rowsPer = (await p.json()).rows || []; renderPer(); }
+    }
+
+    async function kirimCsv(hariIni) {
+      document.getElementById("kirim-status").textContent = "Mengirim rekap CSV...";
+      const res = await fetch("/api/kirim-csv", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hari_ini: hariIni })
+      });
+      const data = await res.json();
+      document.getElementById("kirim-status").textContent = data.message || "Selesai.";
+    }
+
+    setInterval(muatLog, 3000);
+    muatLog();
+  </script>
+</body>
+</html>
