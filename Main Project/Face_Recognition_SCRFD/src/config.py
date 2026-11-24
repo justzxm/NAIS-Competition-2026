@@ -43,7 +43,7 @@ FRAME_KONFIRMASI = 5         # berapa kali berturut-turut dikenali sebelum absen
 JEDA_ABSEN = 60 * 60         # detik; orang yang sama tidak dicatat lagi selama jeda ini
 
 # ---- alarm ----
-DURASI_UNKNOWN = 3           # detik Unknown harus terlihat terus-menerus sebelum alarm
+DURASI_UNKNOWN = 3.5           # detik Unknown harus terlihat terus-menerus sebelum alarm
 TOLERANSI_UNKNOWN = 1.0      # detik; Unknown boleh hilang sebentar tanpa mengulang hitungan
 JEDA_ALARM = 4               # detik antar alarm
 SUARA_ABSEN = True           # False untuk mematikan nada saat absen tercatat
@@ -68,3 +68,19 @@ TELEGRAM_KIRIM_ABSEN = True
 TELEGRAM_KIRIM_ASING = True
 JEDA_NOTIF_ASING = 60            # detik antar notifikasi orang asing, agar tidak membanjiri chat
 TELEGRAM_TIMEOUT = 8             # detik menunggu jawaban server
+
+# ---- anti-spoofing (deteksi kedipan, MediaPipe) ----
+LIVENESS_AKTIF = True
+PATH_LANDMARKER = os.path.join(BASE, "models", "face_landmarker.task")
+LIVENESS_LEBAR = 640           # lebar gambar untuk landmarker (lebih kecil = lebih cepat)
+LIVENESS_SETIAP = 1            # jalankan tiap N frame (kedipan singkat, jadi jangan terlalu jarang)
+LIVENESS_MAKS_WAJAH = 3
+KEDIP_TUTUP = 0.4              # skor "mata tertutup" di atas ini dianggap menutup
+KEDIP_BUKA = 0.4              # di bawah ini dianggap terbuka lagi
+KEDIP_MAKS_DETIK = 1.0         # mata tertutup lebih lama dari ini bukan kedipan
+LIVENESS_JENDELA = 10.0        # kedipan dianggap berlaku selama ... detik
+LIVENESS_KEDIP_MIN = 2         # jumlah kedipan dalam jendela agar dianggap hidup (2 = lebih ketat)
+LIVENESS_IOU = 0.2             # kecocokan kotak landmarker dengan kotak SCRFD
+SPOOF_DETIK = 10.0             # dikenali tapi tanpa kedipan selama ini = dugaan pemalsuan
+JEDA_SPOOF = 60                # detik antar peringatan pemalsuan untuk wajah yang sama
+TAMPIL_LIVENESS = True         # tampilkan hitungan kedipan di layar (untuk kalibrasi)

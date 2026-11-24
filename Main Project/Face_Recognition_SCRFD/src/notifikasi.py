@@ -131,3 +131,8 @@ def kirim_asing():
         _asing_terakhir = sekarang
         return True
     return False
+
+def kirim_spoof(nama):
+    if not config.TELEGRAM_KIRIM_ASING:
+        return False
+    return kirim(f"⚠️ Dugaan pemalsuan wajah (foto atau layar) atas nama {nama} ({_waktu()})")

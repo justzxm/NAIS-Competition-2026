@@ -5,3 +5,4 @@ onnxruntime==1.31.1
 insightface==2.1
 scikit-image==0.26.0
 scipy==1.18.1
+mediapipe==1.2.3

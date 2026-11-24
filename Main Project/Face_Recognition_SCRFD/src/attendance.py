@@ -30,7 +30,6 @@ def catat(nama):
     return True
 
 
-def catat_asing():
-    """Mencatat satu kejadian orang tidak dikenal ke data/peringatan.csv."""
-    _tulis(config.PATH_PERINGATAN, ["waktu", "kejadian"],
-           [_sekarang(), "orang_tidak_dikenal"])
+def catat_asing(kejadian="orang_tidak_dikenal"):
+    """Mencatat satu kejadian peringatan ke data/peringatan.csv."""
+    _tulis(config.PATH_PERINGATAN, ["waktu", "kejadian"], [_sekarang(), kejadian])

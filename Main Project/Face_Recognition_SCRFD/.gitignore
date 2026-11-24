@@ -4,9 +4,5 @@ data/*
 models/*
 !models/.gitkeep
 
-# rahasia dan lingkungan lokal
-.env
-.venv/
-
 __pycache__/
 *.pyc

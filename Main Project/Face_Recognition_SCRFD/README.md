@@ -1,8 +1,16 @@
-# Sistem Absensi dan Peringatan Orang Asing Berbasis Pengenalan Wajah
+# Sistem Absensi dan Peringatan Orang Asing
+# Berbasis Pengenalan Wajah dan Active Liveness Detection
 
-Sistem real-time yang mengenali wajah orang yang sudah terdaftar, mencatat kehadirannya
-secara otomatis, dan membunyikan peringatan ketika ada orang yang tidak dikenal.
-Hasilnya juga dikirim sebagai notifikasi ke grup Telegram.
+Sistem real-time yang mengenali wajah orang yang sudah terdaftar,
+mencatat kehadirannya secara otomatis, dan membunyikan peringatan
+ketika ada orang yang tidak dikenal.
+
+Sistem dilengkapi Active Liveness Detection menggunakan MediaPipe
+Face Landmarker untuk memverifikasi respons gerakan wajah sebelum
+proses absensi dilakukan.
+
+Hasil pengenalan dan peringatan dikirim sebagai notifikasi
+ke grup Telegram.
 
 Dibuat untuk NAIS Competition 2026 oleh tim SMK Negeri 3 Singaraja.
 
@@ -22,13 +30,55 @@ Dibuat untuk NAIS Competition 2026 oleh tim SMK Negeri 3 Singaraja.
 - Pelacakan wajah antar frame dan pemungutan suara dari beberapa frame terakhir, sehingga satu frame
   yang meleset tidak langsung menjadi absensi atau alarm.
 - Saringan wajah terlalu kecil, buram, dan menoleh.
+- Active Liveness Detection menggunakan MediaPipe Face Landmarker
+  dengan 478 titik landmark wajah.
+- Verifikasi respons kedipan mata sebelum absensi dilakukan.
+- Deteksi dugaan pemalsuan wajah: jika wajah tidak memberikan
+  respons kedipan selama lebih dari 10 detik, sistem mencatat
+  peringatan dan mengirim notifikasi.
 
 ## Alur sistem
 ```
-Kamera -> deteksi wajah (SCRFD) -> embedding wajah (ArcFace, wajah diluruskan otomatis)
-       -> pencocokan dengan database
-            |-- dikenali : absensi tercatat + nada tanda berhasil + notifikasi Telegram
-            |-- Unknown  : alarm berbunyi + kejadian tercatat + notifikasi Telegram
+Kamera
+  |
+  v
+Deteksi wajah (SCRFD)
+  |
+  v
+Active Liveness (MediaPipe)
+  |
+  +-- Wajah memberikan respons kedipan
+  |       |
+  |       v
+  |   Lolos pemeriksaan Active Liveness
+  |       |
+  |       v
+  |   ArcFace + pencocokan database
+  |       |
+  |       +-- Dikenali
+  |       |     -> Absensi tercatat
+  |       |     -> Nada berhasil
+  |       |     -> Notifikasi Telegram
+  |       |
+  |       +-- Unknown
+  |             -> Peringatan orang asing
+  |             -> Alarm
+  |             -> Notifikasi Telegram
+  |
+  +-- Belum memberikan respons kedipan
+          |
+          v
+      Status memverifikasi
+          |
+          v
+      Lebih dari 10 detik
+          |
+          v
+      Dugaan pemalsuan wajah
+          |
+          +-- Catatan peringatan
+          +-- Alarm
+          +-- Notifikasi Telegram
 ```
 
 ## Struktur folder
@@ -36,24 +86,31 @@ Kamera -> deteksi wajah (SCRFD) -> embedding wajah (ArcFace, wajah diluruskan ot
 Face_Recognition_SCRFD/
 ├── README.md
 ├── requirements.txt
-├── .env.contoh                contoh pengaturan Telegram (salin menjadi .env)
-├── models/                    model (tidak ikut repo)
-├── data/                      database wajah, absensi, peringatan (tidak ikut repo)
+├── .env_contoh
+│
+├── models/
+│   ├── buffalo_sc/
+│   │   ├── det_500m.onnx
+│   │   └── w600k_mbf.onnx
+│   │
+│   └── face_landmarker.task
+│
+├── data/
+│    
 └── src/
-    ├── config.py              semua pengaturan
-    ├── camera.py              membuka dan membaca kamera
-    ├── detect.py              deteksi wajah (SCRFD) dan embedding (ArcFace)
-    ├── recognize.py           pencocokan, pelacakan, dan pemungutan suara
-    ├── register.py            mendaftarkan wajah baru
-    ├── attendance.py          pencatatan absensi dan peringatan ke CSV
-    ├── alarm.py               nada alarm dan nada absensi
-    ├── notifikasi.py          pengiriman pesan dan file ke Telegram
-    ├── main.py                program utama
-    ├── uji_langsung.py        mengukur skor orang terdaftar dan orang asing
-    ├── kirim_csv.py           mengirim rekap CSV ke Telegram
-    ├── cari_chat_id.py        mencari chat ID Telegram
-    └── uji_telegram.py        menguji pengiriman Telegram
-```
+    ├── config.py
+    ├── camera.py
+    ├── detect.py
+    ├── recognize.py
+    ├── register.py
+    ├── attendance.py
+    ├── alarm.py
+    ├── notifikasi.py
+    ├── liveness.py
+    ├── main.py
+    ├── uji_langsung.py
+    ├── kirim_csv.py
+    ├── cari_chat_id.py
 
 ## Cara memasang
 
@@ -79,6 +136,20 @@ memasang Python dari python.org.
 Unduh model dari `https://github.com/deepinsight/insightface/releases/download/model-zoo/buffalo_sc.zip`,
 lalu taruh `det_500m.onnx` dan `w600k_mbf.onnx` langsung di `models/buffalo_sc/`.
 
+### Model Active Liveness
+```
+Unduh model Face Landmarker dari Google:
+
+https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task
+
+Simpan file tersebut di:
+
+models/face_landmarker.task
+
+Model ini digunakan oleh MediaPipe Face Landmarker
+untuk mendeteksi 478 titik landmark wajah.
+```
+
 ## Cara memakai
 
 1. Daftarkan wajah (tekan `S` untuk menyimpan, `Q` untuk selesai; ambil 6-8 foto dengan sudut
@@ -94,6 +165,7 @@ lalu taruh `det_500m.onnx` dan `w600k_mbf.onnx` langsung di `models/buffalo_sc/`
    ```
 
 Warna kotak di layar: hijau berarti dikenali, merah berarti Unknown, kuning berarti belum diproses
+Kedip untuk mendaftarkan diri ke data absensi.csv, jika tidak berkedip selama 10 detik akan dianggap pemalsuan wajah
 (terlalu kecil, buram, atau masih memverifikasi). Saat pertama dijalankan, izinkan akses kamera.
 
 ## Pengaturan penting (`src/config.py`)
@@ -172,6 +244,8 @@ tumpang tindih; ArcFace memisahkan sebagian besar pengukuran dengan jelas.
 | InsightFace `buffalo_sc`: SCRFD (`det_500m`) dan ArcFace-MBF (`w600k_mbf`) | Deteksi dan pengenalan wajah | Kode MIT; model hanya untuk riset non-komersial |
 | OpenCV, NumPy, ONNX Runtime | Pengolahan gambar dan menjalankan model | Lisensi terbuka |
 | Telegram Bot API | Notifikasi | Ketentuan layanan Telegram |
+| MediaPipe Face Landmarker (`face_landmarker.task`) | Deteksi 478 titik landmark wajah untuk Active Liveness Detection | Apache License 2.0 |
+
 
 ## Pemecahan masalah
 
