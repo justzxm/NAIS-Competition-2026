@@ -36,15 +36,26 @@ MERAH = (0, 0, 255)
 KUNING = (0, 255, 255)
 PUTIH = (255, 255, 255)
 
+PATH_HASIL_UJI = os.path.join(config.DIR_DATA, "hasil_uji.csv")
+
 app = Flask(__name__)
 
 _lock = threading.Lock()
-_mode = "idle"  # "idle" | "absensi" | "daftar"
+_mode = "idle"  # "idle" | "absensi" | "daftar" | "uji"
 _kamera = None
 _detektor = None
 _latest_jpeg = None
 _pesan_sistem = "Siap"
 _status_daftar = {"aktif": False, "pesan": "Belum ada pendaftaran berjalan.", "ok": False}
+_status_uji = {
+    "aktif": False,
+    "label": "",
+    "terdaftar": False,
+    "jumlah": 0,
+    "terakhir": None,
+    "skor_list": [],
+    "pesan": "Belum ada sesi uji berjalan.",
+}
 _worker_thread = None
 
 
@@ -404,13 +415,177 @@ def _proses_pendaftaran(nama, target_sampel=7, batas_detik=15):
         _tutup_kamera()
 
 
-@app.route("/")
-def beranda():
-    html_path = os.path.join(WEB_DIR, "index.html")
-    if os.path.exists(html_path):
-        with open(html_path, encoding="utf-8") as f:
+def _simpan_ringkasan_uji(label, terdaftar, skor_list):
+    if not skor_list:
+        return None
+    a = np.array(skor_list, dtype=float)
+    jenis = "terdaftar" if terdaftar else "asing"
+    persen_lolos = float((a >= config.THRESHOLD).mean() * 100)
+    p5, p95 = float(np.percentile(a, 5)), float(np.percentile(a, 95))
+    waktu = time.strftime("%Y-%m-%d %H:%M:%S")
+
+    baru = not os.path.exists(PATH_HASIL_UJI)
+    with open(PATH_HASIL_UJI, "a", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        if baru:
+            w.writerow([
+                "waktu", "label", "jenis", "jumlah", "min", "p5",
+                "rata2", "p95", "maks", "threshold", "persen_lolos"
+            ])
+        w.writerow([
+            waktu, label, jenis, len(a),
+            f"{a.min():.3f}", f"{p5:.3f}", f"{a.mean():.3f}",
+            f"{p95:.3f}", f"{a.max():.3f}", config.THRESHOLD, f"{persen_lolos:.0f}"
+        ])
+
+    return {
+        "waktu": waktu,
+        "label": label,
+        "jenis": jenis,
+        "jumlah": int(len(a)),
+        "min": round(float(a.min()), 3),
+        "p5": round(p5, 3),
+        "rata2": round(float(a.mean()), 3),
+        "p95": round(p95, 3),
+        "maks": round(float(a.max()), 3),
+        "threshold": config.THRESHOLD,
+        "persen_lolos": int(round(persen_lolos)),
+    }
+
+
+def _loop_uji(label, terdaftar):
+    global _mode, _status_uji
+    skor_list = []
+    nomor = 0
+
+    try:
+        kamera = _buka_kamera()
+        detektor = _get_detektor()
+        pengenal = Pengenal()
+        _set_pesan(f"Mode uji aktif untuk '{label}' ({'terdaftar' if terdaftar else 'asing'})")
+
+        while True:
+            with _lock:
+                if _mode != "uji":
+                    break
+
+            frame = kamera.baca()
+            if frame is None:
+                time.sleep(0.05)
+                continue
+
+            teks, warna = "Menunggu wajah...", KUNING
+            kotak_terakhir = None
+
+            if nomor % config.PROSES_SETIAP == 0:
+                hasil = detektor.deteksi_penuh(frame)
+                if not hasil:
+                    teks, warna = "Tidak ada wajah", KUNING
+                else:
+                    d = max(
+                        hasil,
+                        key=lambda h: (h["kotak"][2] - h["kotak"][0]) * (h["kotak"][3] - h["kotak"][1]),
+                    )
+                    kotak_terakhir = d["kotak"]
+                    x1, y1, x2, y2 = kotak_terakhir
+                    ukuran = min(x2 - x1, y2 - y1)
+
+                    if ukuran < config.UKURAN_WAJAH_MIN:
+                        teks, warna = f"Terlalu kecil ({ukuran}px), mendekat", KUNING
+                    elif not hadap_depan(d["kps"]):
+                        teks, warna = "Menoleh, tidak dihitung", KUNING
+                    elif d["emb"] is not None:
+                        emb = d["emb"]
+                        if terdaftar:
+                            nama_cocok, skor = label, pengenal.skor_untuk(emb, label)
+                        else:
+                            semua = {n: pengenal._skor_nama(emb, dd) for n, dd in pengenal.db.items()}
+                            nama_cocok = max(semua, key=semua.get)
+                            skor = semua[nama_cocok]
+
+                        skor_val = round(float(skor), 3)
+                        skor_list.append(skor_val)
+                        if terdaftar and skor < 0.45:
+                            os.makedirs(os.path.join(config.DIR_DATA, "skor_rendah"), exist_ok=True)
+                            cv2.imwrite(
+                                os.path.join(config.DIR_DATA, "skor_rendah", f"{label}_{skor:.2f}_{nomor}.jpg"),
+                                frame,
+                            )
+
+                        lolos = skor >= config.THRESHOLD
+                        teks = f"{nama_cocok}: {skor:.2f} ({'LOLOS' if lolos else 'ditolak'})"
+                        baik = lolos if terdaftar else not lolos
+                        warna = HIJAU if baik else MERAH
+
+                        with _lock:
+                            _status_uji["jumlah"] = len(skor_list)
+                            _status_uji["terakhir"] = skor_val
+                            _status_uji["skor_list"] = skor_list[-80:]
+
+            nomor += 1
+
+            if kotak_terakhir is not None:
+                x1, y1, x2, y2 = kotak_terakhir
+                cv2.rectangle(frame, (x1, y1), (x2, y2), warna, 2)
+            cv2.putText(frame, teks, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.75, warna, 2)
+            cv2.putText(
+                frame,
+                f"Uji: {label} | n={len(skor_list)} | THR={config.THRESHOLD}",
+                (10, 62),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.65,
+                PUTIH,
+                2,
+            )
+            _simpan_jpeg(frame)
+            time.sleep(0.01)
+
+    except Exception as e:
+        with _lock:
+            _status_uji["pesan"] = f"Kesalahan saat uji: {e}"
+        _set_pesan(f"Error uji: {e}")
+    finally:
+        ringkasan_data = _simpan_ringkasan_uji(label, terdaftar, skor_list)
+        with _lock:
+            _mode = "idle"
+            _status_uji["aktif"] = False
+            if ringkasan_data:
+                _status_uji["pesan"] = (
+                    f"Selesai ({len(skor_list)} data). Rata-rata {ringkasan_data['rata2']:.2f}, "
+                    f"lolos {ringkasan_data['persen_lolos']}%."
+                )
+            else:
+                _status_uji["pesan"] = "Sesi uji selesai tanpa pengukuran skor yang valid."
+        _tutup_kamera()
+        _set_pesan("Siap")
+
+
+def _render_html(filename):
+    path = os.path.join(WEB_DIR, filename)
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
             return f.read()
-    return render_template_string("<h1>web/index.html belum ditemukan</h1>")
+    return render_template_string("<h1>File {{ fn }} belum ditemukan di folder web/</h1>", fn=filename)
+
+
+@app.route("/")
+def halaman_utama():
+    return _render_html("index.html")
+
+
+@app.route("/uji")
+def halaman_uji():
+    return _render_html("uji.html")
+
+
+@app.route("/log")
+def halaman_log():
+    return _render_html("log.html")
+
+
+@app.route("/pengaturan")
+def halaman_pengaturan():
+    return _render_html("pengaturan.html")
 
 
 @app.route("/api/frame")
@@ -440,8 +615,8 @@ def api_mode():
         return jsonify({"ok": False, "message": "Mode tidak dikenal."}), 400
 
     with _lock:
-        if _mode == "daftar":
-            return jsonify({"ok": False, "message": "Tunggu pendaftaran wajah selesai dulu."}), 409
+        if _mode in ("daftar", "uji"):
+            return jsonify({"ok": False, "message": f"Selesaikan mode '{_mode}' terlebih dahulu."}), 409
         _mode = mode_baru
         if mode_baru == "absensi":
             _latest_jpeg = _buat_frame_placeholder("Memulai kamera & model wajah...")
@@ -469,8 +644,8 @@ def api_register():
         return jsonify({"ok": False, "message": "Nama wajib diisi."}), 400
 
     with _lock:
-        if _mode == "daftar":
-            return jsonify({"ok": False, "message": "Pendaftaran sedang berjalan."}), 409
+        if _mode != "idle":
+            return jsonify({"ok": False, "message": f"Sistem sedang dalam mode '{_mode}'."}), 409
         _mode = "daftar"
         _latest_jpeg = _buat_frame_placeholder(f"Menyiapkan daftar: {nama}...")
         _status_daftar = {
@@ -489,11 +664,79 @@ def api_register_status():
         return jsonify(_status_daftar)
 
 
+@app.route("/api/pengguna")
+def api_pengguna():
+    db = {}
+    if os.path.exists(config.PATH_DATABASE):
+        with open(config.PATH_DATABASE, "rb") as f:
+            db = pickle.load(f)
+    daftar = [{"nama": k, "jumlah_sampel": len(v)} for k, v in db.items()]
+    return jsonify({"pengguna": daftar, "threshold": config.THRESHOLD})
+
+
+@app.route("/api/uji/mulai", methods=["POST"])
+def api_uji_mulai():
+    global _mode, _status_uji, _latest_jpeg
+    payload = request.get_json(silent=True) or {}
+    label = (payload.get("label") or "").strip()
+    if not label:
+        return jsonify({"ok": False, "message": "Label penguji wajib diisi."}), 400
+
+    db = {}
+    if os.path.exists(config.PATH_DATABASE):
+        with open(config.PATH_DATABASE, "rb") as f:
+            db = pickle.load(f)
+
+    if not db:
+        return jsonify({"ok": False, "message": "Database wajah masih kosong. Daftarkan wajah dulu."}), 400
+
+    terdaftar = label in db
+
+    with _lock:
+        if _mode != "idle":
+            return jsonify({"ok": False, "message": f"Sistem sedang dalam mode '{_mode}'."}), 409
+        _mode = "uji"
+        _latest_jpeg = _buat_frame_placeholder(f"Menyiapkan uji: {label}...")
+        _status_uji = {
+            "aktif": True,
+            "label": label,
+            "terdaftar": terdaftar,
+            "jumlah": 0,
+            "terakhir": None,
+            "skor_list": [],
+            "pesan": f"Sesi uji '{label}' ({'terdaftar' if terdaftar else 'asing'}) berjalan...",
+        }
+
+    threading.Thread(target=_loop_uji, args=(label, terdaftar), daemon=True).start()
+    return jsonify({"ok": True, "message": f"Sesi uji '{label}' dimulai."})
+
+
+@app.route("/api/uji/stop", methods=["POST"])
+def api_uji_stop():
+    global _mode
+    with _lock:
+        if _mode != "uji":
+            return jsonify({"ok": False, "message": "Tidak ada sesi uji aktif."}), 400
+        _mode = "idle"
+    return jsonify({"ok": True, "message": "Menghentikan sesi uji & menyimpan ringkasan..."})
+
+
+@app.route("/api/uji/status")
+def api_uji_status():
+    with _lock:
+        return jsonify(_status_uji)
+
+
 def _baca_csv(path):
     if not os.path.exists(path):
         return []
     with open(path, encoding="utf-8", newline="") as f:
         return list(csv.DictReader(f))
+
+
+@app.route("/api/uji/hasil")
+def api_uji_hasil():
+    return jsonify({"rows": _baca_csv(PATH_HASIL_UJI), "threshold": config.THRESHOLD})
 
 
 @app.route("/api/absensi")
@@ -559,6 +802,26 @@ def api_kirim_csv():
             os.remove(sementara)
 
     return jsonify({"ok": True, "message": " | ".join(hasil)})
+
+
+@app.route("/api/info-konfig")
+def api_info_konfig():
+    return jsonify({
+        "kamera_id": config.KAMERA_ID,
+        "resolusi": f"{config.LEBAR}x{config.TINGGI}",
+        "det_size": list(config.DET_SIZE),
+        "threshold": config.THRESHOLD,
+        "threshold_tahan": config.THRESHOLD_TAHAN,
+        "ukuran_wajah_min": config.UKURAN_WAJAH_MIN,
+        "tajam_min": config.TAJAM_MIN,
+        "frame_konfirmasi": config.FRAME_KONFIRMASI,
+        "durasi_unknown": config.DURASI_UNKNOWN,
+        "liveness_aktif": config.LIVENESS_AKTIF,
+        "liveness_kedip_min": config.LIVENESS_KEDIP_MIN,
+        "liveness_jendela": config.LIVENESS_JENDELA,
+        "spoof_detik": config.SPOOF_DETIK,
+        "telegram_aktif": notifikasi.aktif(),
+    })
 
 
 if __name__ == "__main__":
