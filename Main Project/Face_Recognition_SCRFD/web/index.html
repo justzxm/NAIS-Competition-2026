@@ -3,152 +3,559 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Panel Lokal — Absensi & Keamanan Wajah</title>
+  <title>Kamera & Registrasi — Face Recognition</title>
   <style>
-    * { box-sizing: border-box; }
-    body {
-      font-family: Arial, sans-serif;
-      margin: 20px;
-      background: #f3f4f6;
-      color: #111827;
+    :root {
+      --bg: #f1f5f9;
+      --surface: #ffffff;
+      --surface-2: #f8fafc;
+      --surface-3: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --border-strong: #cbd5e1;
+      --primary: #0f172a;
+      --primary-hover: #1e293b;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --accent-soft: #eff6ff;
+      --danger: #dc2626;
+      --danger-soft: #fef2f2;
+      --success: #059669;
+      --success-soft: #ecfdf5;
+      --radius-lg: 18px;
+      --radius-md: 12px;
+      --radius-sm: 9px;
+      --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.04);
+      --shadow-md: 0 10px 28px rgba(15, 23, 42, 0.10);
+      --shadow-drawer: 12px 0 32px rgba(15, 23, 42, 0.14);
     }
-    h1 { font-size: 22px; margin-bottom: 16px; }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      padding: 22px 18px 48px;
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background:
+        radial-gradient(circle at 12% 0%, rgba(37, 99, 235, 0.06), transparent 42%),
+        var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    .app { max-width: 1240px; margin: 0 auto; }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+      padding: 15px 20px;
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .topbar-left { display: flex; align-items: center; gap: 14px; }
+
+    .burger-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      display: inline-flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 4.5px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .burger-btn:hover { background: var(--surface-3); border-color: var(--border-strong); }
+    .burger-btn span { width: 16px; height: 1.8px; background: var(--text); border-radius: 2px; }
+
+    .brand h1 { margin: 0; font-size: 18.5px; font-weight: 700; letter-spacing: -0.02em; }
+    .brand p { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
+
+    .topbar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+    .status-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 12.5px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+    }
+    .status-indicator .dot { width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; }
+    .status-indicator.is-absensi { background: var(--success-soft); border-color: #a7f3d0; color: #065f46; }
+    .status-indicator.is-absensi .dot { background: var(--success); }
+    .status-indicator.is-daftar { background: var(--accent-soft); border-color: #bfdbfe; color: #1e40af; }
+    .status-indicator.is-daftar .dot { background: var(--accent); }
+
     .grid {
       display: grid;
-      grid-template-columns: 1.35fr 1fr;
-      gap: 18px;
+      grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+      gap: 20px;
       align-items: start;
     }
+
     .card {
-      background: #ffffff;
-      border-radius: 10px;
-      padding: 16px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-      margin-bottom: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      box-shadow: var(--shadow-sm);
     }
-    h2 { font-size: 17px; margin: 0 0 12px 0; }
-    .controls {
+
+    .card-head {
       display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin-bottom: 10px;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
     }
-    button {
+
+    .card-title { margin: 0; font-size: 15.5px; font-weight: 650; }
+    .card-meta { font-size: 12px; color: var(--muted); }
+
+    .action-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+
+    .btn {
+      appearance: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
       padding: 9px 14px;
-      border: none;
-      border-radius: 6px;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+      font-size: 13px;
       font-weight: 600;
       cursor: pointer;
-      background: #2563eb;
-      color: #ffffff;
+      text-decoration: none;
+      transition: all 0.15s ease;
     }
-    button.secondary { background: #4b5563; }
-    button.danger { background: #dc2626; }
-    button.success { background: #059669; }
-    input[type="text"] {
-      flex: 1;
-      min-width: 180px;
-      padding: 9px 12px;
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
-    }
-    #camera-view {
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+    .btn-primary.is-running { background: var(--success); }
+    .btn-accent { background: var(--accent); color: #fff; }
+    .btn-accent:hover:not(:disabled) { background: var(--accent-hover); }
+    .btn-danger { background: var(--surface); color: var(--danger); border-color: #fecaca; }
+    .btn-danger:hover:not(:disabled) { background: var(--danger-soft); }
+    .btn-secondary { background: var(--surface-2); color: var(--text); border-color: var(--border); }
+    .btn-secondary:hover:not(:disabled) { background: var(--surface-3); }
+    .btn-sm { padding: 6px 11px; font-size: 12px; border-radius: 7px; }
+
+    .viewport {
+      position: relative;
       width: 100%;
-      max-height: 430px;
-      object-fit: contain;
-      background: #111827;
-      border-radius: 8px;
-      display: block;
+      aspect-ratio: 16 / 9;
+      background: #0b1120;
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      border: 1px solid #1e293b;
     }
-    .status {
-      margin-top: 10px;
-      font-size: 14px;
-      color: #374151;
+    .viewport.is-live { border-color: rgba(5, 150, 105, 0.6); box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.12); }
+    .viewport.is-reg { border-color: rgba(37, 99, 235, 0.6); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12); }
+
+    #camera-view { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+    .viewport-bar {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      pointer-events: none;
     }
-    table {
-      width: 100%;
-      border-collapse: collapse;
+
+    .overlay-box {
+      background: rgba(15, 23, 42, 0.82);
+      backdrop-filter: blur(6px);
+      color: #f8fafc;
+      font-size: 11.5px;
+      font-weight: 500;
+      padding: 5px 10px;
+      border-radius: 7px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .status-strip {
+      margin-top: 12px;
+      padding: 10px 13px;
+      border-radius: var(--radius-sm);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
       font-size: 13px;
     }
-    th, td {
-      border-bottom: 1px solid #e5e7eb;
-      padding: 7px 8px;
-      text-align: left;
+
+    .reg-guide {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
     }
-    th { background: #f9fafb; }
-    @media (max-width: 900px) {
-      .grid { grid-template-columns: 1fr; }
+
+    .reg-step {
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      background: var(--surface-2);
+      border-left: 3px solid var(--accent);
+      border-top: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--muted);
     }
+    .reg-step strong { display: block; color: var(--text); font-size: 12.5px; margin-bottom: 2px; }
+
+    .reg-form { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    .input {
+      flex: 1;
+      min-width: 190px;
+      padding: 9px 12px;
+      font-size: 13.5px;
+      color: var(--text);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      outline: none;
+    }
+    .input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12); }
+
+    .reg-notes {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .reg-notes span::before { content: "• "; color: var(--accent); font-weight: 700; }
+
+    .progress-wrap { margin-top: 12px; display: none; }
+    .progress-wrap.is-visible { display: block; }
+    .progress-header { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+    .progress-track { height: 7px; width: 100%; background: var(--surface-3); border-radius: 6px; overflow: hidden; }
+    .progress-fill { height: 100%; width: 10%; background: var(--accent); transition: width 0.25s ease; }
+
+    .feedback-box {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      font-size: 12.5px;
+      color: var(--muted);
+    }
+    .feedback-box.ok { background: var(--success-soft); border-color: #a7f3d0; color: #065f46; font-weight: 500; }
+    .feedback-box.err { background: var(--danger-soft); border-color: #fecaca; color: #991b1b; font-weight: 500; }
+
+    .post-reg-actions { display: none; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .post-reg-actions.is-visible { display: flex; }
+
+    .db-list {
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      font-size: 12.5px;
+      color: var(--muted);
+    }
+    .db-items { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .db-chip {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 5px 10px;
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    /* Drawer */
+    .drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.36);
+      z-index: 60;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    .drawer-backdrop.is-open { opacity: 1; pointer-events: auto; }
+
+    .drawer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 310px;
+      max-width: 88vw;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      box-shadow: var(--shadow-drawer);
+      z-index: 70;
+      transform: translateX(-100%);
+      transition: transform 0.22s ease;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .drawer.is-open { transform: translateX(0); }
+    .drawer-head { display: flex; justify-content: space-between; align-items: center; }
+    .drawer-head h2 { margin: 0; font-size: 16px; }
+    .nav-stack { display: flex; flex-direction: column; gap: 8px; }
+    .nav-link {
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      text-decoration: none;
+      color: var(--text);
+      font-size: 13.5px;
+      font-weight: 600;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+    }
+    .nav-link:hover, .nav-link.is-here { background: var(--accent-soft); border-color: #bfdbfe; color: #1e40af; }
+
+    /* Toast */
+    .toast-wrap { position: fixed; right: 20px; bottom: 20px; z-index: 80; display: flex; flex-direction: column; gap: 8px; max-width: 360px; }
+    .toast { padding: 11px 14px; border-radius: var(--radius-sm); background: var(--primary); color: #fff; font-size: 13px; font-weight: 500; box-shadow: var(--shadow-md); }
+    .toast.success { background: #065f46; }
+    .toast.error { background: #991b1b; }
+
+    @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } }
+    @media (max-width: 640px) { .reg-guide { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
-  <h1>Sistem Absensi & Pemantauan Keamanan (Lokal)</h1>
+  <div id="drawer-backdrop" class="drawer-backdrop" onclick="toggleDrawer(false)"></div>
+  <aside id="nav-drawer" class="drawer">
+    <div class="drawer-head">
+      <h2>Halaman</h2>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="toggleDrawer(false)">Tutup</button>
+    </div>
+    <nav class="nav-stack">
+      <a class="nav-link is-here" href="/">Kamera &amp; Registrasi</a>
+      <a class="nav-link" href="/uji">Uji Skor &amp; Grafik</a>
+      <a class="nav-link" href="/log">Log Kehadiran &amp; CSV</a>
+      <a class="nav-link" href="/pengaturan">Pengaturan &amp; Info</a>
+    </nav>
+  </aside>
 
-  <div class="grid">
-    <div>
-      <div class="card">
-        <h2>Kamera & Mode Absensi</h2>
-        <div class="controls">
-          <button class="success" onclick="setMode('absensi')">Mulai Absensi & Keamanan</button>
-          <button class="danger" onclick="setMode('idle')">Hentikan Kamera</button>
-          <button class="secondary" onclick="kirimCsv(false)">Kirim Semua CSV</button>
-          <button class="secondary" onclick="kirimCsv(true)">Kirim CSV Hari Ini</button>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button type="button" class="burger-btn" aria-label="Buka menu" onclick="toggleDrawer(true)">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="brand">
+          <h1>Kamera &amp; Registrasi Wajah</h1>
+          <p>Absensi real-time, anti-spoofing kedipan, dan pendaftaran wajah baru</p>
         </div>
-        <img id="camera-view" src="" alt="Kamera tidak aktif" />
-        <div class="status" id="status-text">Status: Siap</div>
       </div>
+      <div class="topbar-right">
+        <a class="btn btn-secondary btn-sm" href="/uji">Uji &amp; Grafik</a>
+        <a class="btn btn-secondary btn-sm" href="/log">Log CSV</a>
+        <div id="mode-pill" class="status-indicator">
+          <span class="dot"></span>
+          <span id="mode-text">Siaga</span>
+        </div>
+      </div>
+    </header>
 
-      <div class="card">
-        <h2>Pendaftaran Wajah Baru</h2>
-        <form onsubmit="mulaiDaftar(event)">
-          <div class="controls">
-            <input type="text" id="nama-wajah" placeholder="Nama lengkap / ID" required />
-            <button type="submit">Daftar Wajah</button>
+    <main class="grid">
+      <section class="card">
+        <div class="card-head">
+          <h2 class="card-title">Live Camera</h2>
+          <span class="card-meta">Esc untuk menghentikan</span>
+        </div>
+
+        <div class="action-bar">
+          <button id="btn-start" type="button" class="btn btn-primary" onclick="setMode('absensi')">Mulai Absensi</button>
+          <button id="btn-stop" type="button" class="btn btn-danger" onclick="setMode('idle')" disabled>Hentikan</button>
+          <button type="button" class="btn btn-secondary" onclick="fokusRegistrasi()">+ Daftar Wajah</button>
+        </div>
+
+        <div id="viewport" class="viewport">
+          <img id="camera-view" src="/api/frame" alt="Pratinjau kamera" />
+          <div class="viewport-bar">
+            <span id="overlay-mode" class="overlay-box">Mode: Siaga</span>
+            <span class="overlay-box">Hadap depan &amp; berkedip alami</span>
           </div>
+        </div>
+
+        <div class="status-strip">
+          <div><strong>Status:</strong> <span id="status-text">Siap</span></div>
+          <span id="sync-time" class="card-meta">-</span>
+        </div>
+      </section>
+
+      <section id="card-registrasi" class="card">
+        <div class="card-head">
+          <h2 class="card-title">Registrasi Wajah Baru</h2>
+          <span class="card-meta">Database lokal</span>
+        </div>
+
+        <div id="reg-guide" class="reg-guide">
+          <div class="reg-step"><strong>1. Isi Nama / ID</strong>Ketik nama unik pengguna.</div>
+          <div class="reg-step"><strong>2. Posisi Wajah</strong>Hadap depan &amp; cukup dekat.</div>
+          <div class="reg-step"><strong>3. Kumpul Sampel</strong>Tunggu hingga tersimpan.</div>
+        </div>
+
+        <form class="reg-form" onsubmit="mulaiDaftar(event)">
+          <input type="text" id="nama-wajah" class="input" placeholder="Nama lengkap atau ID" autocomplete="off" required />
+          <button id="btn-daftar" type="submit" class="btn btn-accent">Mulai Ambil Wajah</button>
         </form>
-        <div class="status" id="daftar-status">Masukkan nama lalu klik Daftar Wajah.</div>
-      </div>
-    </div>
 
-    <div>
-      <div class="card">
-        <h2>Riwayat Kehadiran (absensi.csv)</h2>
-        <table>
-          <thead><tr><th>Nama</th><th>Waktu</th></tr></thead>
-          <tbody id="body-absensi"><tr><td colspan="2">Memuat...</td></tr></tbody>
-        </table>
-      </div>
+        <div class="reg-notes">
+          <span>Hanya 1 wajah di frame</span>
+          <span>Hindari menoleh atau buram</span>
+          <span>Pencahayaan cukup terang</span>
+        </div>
 
-      <div class="card">
-        <h2>Riwayat Peringatan (peringatan.csv)</h2>
-        <table>
-          <thead><tr><th>Waktu</th><th>Kejadian</th></tr></thead>
-          <tbody id="body-peringatan"><tr><td colspan="2">Memuat...</td></tr></tbody>
-        </table>
-      </div>
-    </div>
+        <div id="reg-progress-wrap" class="progress-wrap">
+          <div class="progress-header">
+            <span id="reg-progress-label">Mengambil sampel wajah...</span>
+            <span id="reg-progress-pct">0%</span>
+          </div>
+          <div class="progress-track"><div id="reg-progress-fill" class="progress-fill"></div></div>
+        </div>
+
+        <div id="daftar-status" class="feedback-box">
+          <strong>Belum ada pendaftaran aktif.</strong> Masukkan nama lalu klik <em>Mulai Ambil Wajah</em>.
+        </div>
+
+        <div id="post-reg-actions" class="post-reg-actions">
+          <button type="button" class="btn btn-primary btn-sm" onclick="setMode('absensi')">Mulai Absensi Sekarang</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="fokusRegistrasi()">Daftarkan Wajah Lain</button>
+        </div>
+
+        <div class="db-list">
+          <strong>Wajah Terdaftar di Database:</strong>
+          <div id="db-items" class="db-items"><span class="card-meta">Memuat...</span></div>
+        </div>
+      </section>
+    </main>
   </div>
 
+  <div id="toast-wrap" class="toast-wrap"></div>
+
   <script>
-    let timerFrame = null;
+    let frameTimer = null;
+    let regPollTimer = null;
+    let currentMode = "idle";
+    const frameIntervalMs = Number(localStorage.getItem("ui_frame_ms") || 160);
 
-    function setPesanStatus(teks) {
-      document.getElementById("status-text").textContent = "Status: " + teks;
+    if (localStorage.getItem("ui_show_guide") === "false") {
+      document.getElementById("reg-guide").style.display = "none";
     }
 
-    function mulaiStream() {
-      if (timerFrame) clearInterval(timerFrame);
-      timerFrame = setInterval(() => {
-        document.getElementById("camera-view").src = "/api/frame?t=" + Date.now();
-      }, 150);
+    function toggleDrawer(open) {
+      const d = document.getElementById("nav-drawer");
+      const b = document.getElementById("drawer-backdrop");
+      const next = typeof open === "boolean" ? open : !d.classList.contains("is-open");
+      d.classList.toggle("is-open", next);
+      b.classList.toggle("is-open", next);
     }
 
-    function hentikanStream() {
-      if (timerFrame) {
-        clearInterval(timerFrame);
-        timerFrame = null;
+    function showToast(msg, type = "info") {
+      const wrap = document.getElementById("toast-wrap");
+      const el = document.createElement("div");
+      el.className = `toast ${type}`;
+      el.textContent = msg;
+      wrap.appendChild(el);
+      setTimeout(() => el.remove(), 3200);
+    }
+
+    function fokusRegistrasi() {
+      const card = document.getElementById("card-registrasi");
+      const input = document.getElementById("nama-wajah");
+      card.scrollIntoView({ behavior: "smooth", block: "center" });
+      setTimeout(() => { if (!input.disabled) input.focus(); }, 250);
+    }
+
+    function applyModeUI(mode) {
+      currentMode = mode;
+      const pill = document.getElementById("mode-pill");
+      const modeText = document.getElementById("mode-text");
+      const overlayMode = document.getElementById("overlay-mode");
+      const viewport = document.getElementById("viewport");
+      const btnStart = document.getElementById("btn-start");
+      const btnStop = document.getElementById("btn-stop");
+      const btnDaftar = document.getElementById("btn-daftar");
+      const inputNama = document.getElementById("nama-wajah");
+
+      pill.classList.remove("is-absensi", "is-daftar");
+      viewport.classList.remove("is-live", "is-reg");
+      btnStart.classList.remove("is-running");
+
+      if (mode === "absensi") {
+        pill.classList.add("is-absensi");
+        viewport.classList.add("is-live");
+        modeText.textContent = "Absensi Aktif";
+        overlayMode.textContent = "Mode: Absensi & Anti-Spoofing";
+        btnStart.textContent = "Absensi Berjalan";
+        btnStart.classList.add("is-running");
+        btnStart.disabled = true;
+        btnStop.disabled = false;
+        btnDaftar.disabled = true;
+        inputNama.disabled = true;
+      } else if (mode === "daftar") {
+        pill.classList.add("is-daftar");
+        viewport.classList.add("is-reg");
+        modeText.textContent = "Registrasi Wajah";
+        overlayMode.textContent = "Mode: Registrasi Wajah";
+        btnStart.textContent = "Mulai Absensi";
+        btnStart.disabled = true;
+        btnStop.disabled = true;
+        btnDaftar.disabled = true;
+        inputNama.disabled = true;
+      } else {
+        modeText.textContent = "Siaga";
+        overlayMode.textContent = "Mode: Siaga";
+        btnStart.textContent = "Mulai Absensi";
+        btnStart.disabled = false;
+        btnStop.disabled = true;
+        btnDaftar.disabled = false;
+        inputNama.disabled = false;
       }
-      document.getElementById("camera-view").removeAttribute("src");
+    }
+
+    function refreshFrame() {
+      document.getElementById("camera-view").src = "/api/frame?t=" + Date.now();
+    }
+
+    function startFrameLoop() {
+      if (frameTimer) clearInterval(frameTimer);
+      refreshFrame();
+      frameTimer = setInterval(refreshFrame, frameIntervalMs);
+    }
+
+    function stopFrameLoop() {
+      if (frameTimer) { clearInterval(frameTimer); frameTimer = null; }
+      refreshFrame();
     }
 
     async function setMode(mode) {
@@ -159,25 +566,83 @@
           body: JSON.stringify({ mode })
         });
         const data = await res.json();
-        setPesanStatus(data.message || mode);
-        if (mode === "absensi") {
-          mulaiStream();
+        document.getElementById("status-text").textContent = data.message || mode;
+        if (res.ok && mode === "absensi") {
+          document.getElementById("post-reg-actions").classList.remove("is-visible");
+          applyModeUI("absensi");
+          startFrameLoop();
+          showToast("Mode absensi aktif", "success");
+        } else if (res.ok && mode === "idle") {
+          applyModeUI("idle");
+          stopFrameLoop();
+          showToast("Kamera dihentikan");
         } else {
-          hentikanStream();
+          showToast(data.message || "Gagal mengubah mode", "error");
         }
       } catch (err) {
-        setPesanStatus("Error: " + err.message);
+        showToast("Error: " + err.message, "error");
       }
+    }
+
+    function setProgress(pct, labelText) {
+      const c = Math.max(0, Math.min(100, pct));
+      document.getElementById("reg-progress-fill").style.width = c + "%";
+      document.getElementById("reg-progress-pct").textContent = c + "%";
+      if (labelText) document.getElementById("reg-progress-label").textContent = labelText;
+    }
+
+    async function pollRegisterStatus() {
+      const el = document.getElementById("daftar-status");
+      const wrap = document.getElementById("reg-progress-wrap");
+      const post = document.getElementById("post-reg-actions");
+      try {
+        const res = await fetch("/api/register-status");
+        if (!res.ok) return;
+        const st = await res.json();
+        el.textContent = st.pesan || "Memproses...";
+        el.classList.remove("ok", "err");
+
+        const m = (st.pesan || "").match(/(\d+)\s*\/\s*(\d+)/);
+        if (m) {
+          const cur = Math.min(Number(m[1]), Number(m[2]));
+          const tot = Math.max(Number(m[2]), 1);
+          setProgress(Math.round((cur / tot) * 100), `Sampel terkumpul: ${cur} dari ${tot}`);
+        }
+
+        if (!st.aktif) {
+          clearInterval(regPollTimer);
+          regPollTimer = null;
+          wrap.classList.remove("is-visible");
+          applyModeUI("idle");
+          stopFrameLoop();
+          if (st.ok) {
+            el.classList.add("ok");
+            post.classList.add("is-visible");
+            document.getElementById("nama-wajah").value = "";
+            muatPengguna();
+            showToast(st.pesan, "success");
+          } else {
+            el.classList.add("err");
+            showToast(st.pesan, "error");
+          }
+        }
+      } catch (_) {}
     }
 
     async function mulaiDaftar(e) {
       e.preventDefault();
       const nama = document.getElementById("nama-wajah").value.trim();
       if (!nama) return;
+      const el = document.getElementById("daftar-status");
+      const wrap = document.getElementById("reg-progress-wrap");
 
-      const elStatus = document.getElementById("daftar-status");
-      elStatus.textContent = `Mengambil sampel wajah untuk "${nama}"...`;
-      mulaiStream();
+      document.getElementById("post-reg-actions").classList.remove("is-visible");
+      el.classList.remove("ok", "err");
+      el.textContent = `Menyiapkan pendaftaran untuk "${nama}"...`;
+      wrap.classList.add("is-visible");
+      setProgress(10, "Menyiapkan kamera...");
+      applyModeUI("daftar");
+      startFrameLoop();
 
       try {
         const res = await fetch("/api/register", {
@@ -186,61 +651,65 @@
           body: JSON.stringify({ nama })
         });
         const data = await res.json();
-        elStatus.textContent = data.message || "Selesai.";
-        if (data.ok) {
-          document.getElementById("nama-wajah").value = "";
+        if (!res.ok) {
+          el.textContent = data.message || "Gagal memulai pendaftaran.";
+          el.classList.add("err");
+          wrap.classList.remove("is-visible");
+          applyModeUI("idle");
+          showToast(data.message || "Gagal", "error");
+          return;
         }
+        if (regPollTimer) clearInterval(regPollTimer);
+        regPollTimer = setInterval(pollRegisterStatus, 450);
       } catch (err) {
-        elStatus.textContent = "Gagal mendaftar: " + err.message;
+        el.textContent = "Error: " + err.message;
+        el.classList.add("err");
+        wrap.classList.remove("is-visible");
+        applyModeUI("idle");
       }
     }
 
-    async function kirimCsv(hariIni) {
+    async function muatPengguna() {
       try {
-        const res = await fetch("/api/kirim-csv", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ hari_ini: hariIni })
-        });
+        const res = await fetch("/api/pengguna");
+        if (!res.ok) return;
         const data = await res.json();
-        setPesanStatus(data.message || "Terkirim.");
-      } catch (err) {
-        setPesanStatus("Gagal kirim CSV: " + err.message);
-      }
-    }
-
-    function isiTabel(tbodyId, rows, cols) {
-      const tbody = document.getElementById(tbodyId);
-      if (!rows || rows.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="${cols.length}">Belum ada data</td></tr>`;
-        return;
-      }
-      tbody.innerHTML = rows
-        .slice(-10)
-        .reverse()
-        .map(r => `<tr>${cols.map(c => `<td>${r[c] ?? ""}</td>`).join("")}</tr>`)
-        .join("");
-    }
-
-    async function muatCsv() {
-      try {
-        const [rAbs, rPer] = await Promise.all([
-          fetch("/api/absensi"),
-          fetch("/api/peringatan")
-        ]);
-        if (rAbs.ok) {
-          const dAbs = await rAbs.json();
-          isiTabel("body-absensi", dAbs.rows || [], ["nama", "waktu"]);
+        const box = document.getElementById("db-items");
+        const list = data.pengguna || [];
+        if (!list.length) {
+          box.innerHTML = `<span class="card-meta">Belum ada wajah terdaftar di database.pkl.</span>`;
+          return;
         }
-        if (rPer.ok) {
-          const dPer = await rPer.json();
-          isiTabel("body-peringatan", dPer.rows || [], ["waktu", "kejadian"]);
-        }
+        box.innerHTML = list.map(p => `<span class="db-chip">${p.nama} (${p.jumlah_sampel})</span>`).join("");
       } catch (_) {}
     }
 
-    setInterval(muatCsv, 2500);
-    muatCsv();
+    async function syncStatus() {
+      try {
+        const res = await fetch("/api/status");
+        if (!res.ok) return;
+        const st = await res.json();
+        if (st.message) document.getElementById("status-text").textContent = st.message;
+        if (st.mode && st.mode !== currentMode) {
+          applyModeUI(st.mode);
+          if (st.mode === "idle") stopFrameLoop();
+          else startFrameLoop();
+        }
+        document.getElementById("sync-time").textContent =
+          "Sync " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      } catch (_) {}
+    }
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        if (document.getElementById("nav-drawer").classList.contains("is-open")) toggleDrawer(false);
+        else if (currentMode === "absensi") setMode("idle");
+      }
+    });
+
+    setInterval(syncStatus, 1800);
+    syncStatus();
+    muatPengguna();
   </script>
 </body>
 </html>
