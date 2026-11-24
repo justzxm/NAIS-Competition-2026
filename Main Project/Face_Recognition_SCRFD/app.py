@@ -1,15 +1,16 @@
 import csv
+import io
 import os
+import pickle
 import sys
 import tempfile
 import threading
 import time
-from collections import deque
 from datetime import date
-import pickle
 
 import cv2
-from flask import Flask, jsonify, render_template_string, request, send_file
+import numpy as np
+from flask import Flask, jsonify, render_template_string, request, Response
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 SRC_DIR = os.path.join(ROOT_DIR, "src")
@@ -38,14 +39,40 @@ _mode = "idle"  # "idle" | "absensi" | "daftar"
 _kamera = None
 _detektor = None
 _latest_jpeg = None
+_pesan_sistem = "Siap"
 _status_daftar = {"aktif": False, "pesan": "Belum ada pendaftaran berjalan.", "ok": False}
 _worker_thread = None
-_stop_worker = threading.Event()
+
+
+def _buat_frame_placeholder(teks="Menyiapkan kamera..."):
+    kanvas = np.zeros((360, 640, 3), dtype=np.uint8)
+    kanvas[:] = (24, 24, 27)
+    cv2.putText(
+        kanvas,
+        teks,
+        (30, 185),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.75,
+        (229, 231, 235),
+        2,
+    )
+    ok, buf = cv2.imencode(".jpg", kanvas, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+    return buf.tobytes() if ok else b""
+
+
+_PLACEHOLDER_JPEG = _buat_frame_placeholder()
+
+
+def _set_pesan(teks):
+    global _pesan_sistem
+    with _lock:
+        _pesan_sistem = teks
 
 
 def _get_detektor():
     global _detektor
     if _detektor is None:
+        _set_pesan("Memuat model deteksi & pengenalan wajah...")
         _detektor = Detektor()
     return _detektor
 
@@ -53,6 +80,7 @@ def _get_detektor():
 def _buka_kamera():
     global _kamera
     if _kamera is None:
+        _set_pesan(f"Membuka kamera ID {config.KAMERA_ID}...")
         _kamera = Kamera()
     return _kamera
 
@@ -76,131 +104,173 @@ def _simpan_jpeg(frame):
 
 
 def _loop_absensi():
-    kamera = _buka_kamera()
-    detektor = _get_detektor()
-    pengenal = Pengenal()
-    pelacak = Pelacak()
+    global _mode
+    try:
+        kamera = _buka_kamera()
+        detektor = _get_detektor()
+        pengenal = Pengenal()
+        pelacak = Pelacak()
+        _set_pesan("Mode absensi & keamanan aktif.")
 
-    hitung_nama = {}
-    unknown_sejak = None
-    unknown_terakhir = 0.0
-    tampilan = []
-    pesan, waktu_pesan = "", 0.0
-    nomor = 0
-    fps, t_lalu = 0.0, time.time()
+        hitung_nama = {}
+        unknown_sejak = None
+        unknown_terakhir = 0.0
+        tampilan = []
+        pesan, waktu_pesan = "", 0.0
+        nomor = 0
+        fps, t_lalu = 0.0, time.time()
 
-    while not _stop_worker.is_set():
-        with _lock:
-            if _mode != "absensi":
-                break
+        while True:
+            with _lock:
+                if _mode != "absensi":
+                    break
 
-        frame = kamera.baca()
-        if frame is None:
-            time.sleep(0.05)
-            continue
+            frame = kamera.baca()
+            if frame is None:
+                _set_pesan("Gagal membaca frame dari kamera.")
+                time.sleep(0.05)
+                continue
 
-        if nomor % config.PROSES_SETIAP == 0:
-            t_proses = time.time()
-            tampilan = []
-            dikenali = set()
-            ada_unknown = False
+            if nomor % config.PROSES_SETIAP == 0:
+                t_proses = time.time()
+                tampilan = []
+                dikenali = set()
+                ada_unknown = False
 
-            for d in detektor.deteksi_penuh(frame):
-                kotak = d["kotak"]
-                x1, y1, x2, y2 = kotak
+                for d in detektor.deteksi_penuh(frame):
+                    kotak = d["kotak"]
+                    x1, y1, x2, y2 = kotak
 
-                if min(x2 - x1, y2 - y1) < config.UKURAN_WAJAH_MIN:
-                    tampilan.append((kotak, "Mendekat", KUNING))
-                    continue
+                    if min(x2 - x1, y2 - y1) < config.UKURAN_WAJAH_MIN:
+                        tampilan.append((kotak, "Mendekat", KUNING))
+                        continue
 
-                wajah = potong_wajah(frame, kotak)
-                if wajah is None:
-                    continue
+                    wajah = potong_wajah(frame, kotak)
+                    if wajah is None:
+                        continue
 
-                jalur = pelacak.cari(kotak, t_proses)
-                stabil = Pelacak.nama_stabil(jalur)
+                    jalur = pelacak.cari(kotak, t_proses)
+                    stabil = Pelacak.nama_stabil(jalur)
 
-                tajam = ketajaman(wajah)
-                if tajam < config.TAJAM_MIN:
-                    tampilan.append((kotak, f"Buram {tajam:.0f}", KUNING))
-                    continue
+                    tajam = ketajaman(wajah)
+                    if tajam < config.TAJAM_MIN:
+                        tampilan.append((kotak, f"Buram {tajam:.0f}", KUNING))
+                        continue
 
-                if not hadap_depan(d["kps"]):
-                    if stabil and stabil != "Unknown":
-                        dikenali.add(stabil)
-                        tampilan.append((kotak, f"{stabil} (menoleh)", HIJAU))
+                    if not hadap_depan(d["kps"]):
+                        if stabil and stabil != "Unknown":
+                            dikenali.add(stabil)
+                            tampilan.append((kotak, f"{stabil} (menoleh)", HIJAU))
+                        else:
+                            tampilan.append((kotak, "Menoleh", KUNING))
+                        continue
+
+                    emb = d["emb"]
+                    if emb is None:
+                        continue
+                    nama, skor = pengenal.cocokkan(emb)
+
+                    if nama == "Unknown" and jalur["nama"] not in (None, "Unknown"):
+                        skor_tahan = pengenal.skor_untuk(emb, jalur["nama"])
+                        if skor_tahan >= config.THRESHOLD_TAHAN:
+                            nama, skor = jalur["nama"], skor_tahan
+
+                    jalur["riwayat"].append(nama)
+                    stabil = Pelacak.nama_stabil(jalur)
+                    if stabil is not None:
+                        jalur["nama"] = stabil
+
+                    if stabil is None:
+                        tampilan.append((kotak, "Memverifikasi", KUNING))
+                    elif stabil == "Unknown":
+                        ada_unknown = True
+                        tampilan.append((kotak, f"Unknown {skor:.2f}", MERAH))
                     else:
-                        tampilan.append((kotak, "Menoleh", KUNING))
-                    continue
+                        dikenali.add(stabil)
+                        tampilan.append((kotak, f"{stabil} {skor:.2f}", HIJAU))
 
-                emb = d["emb"]
-                if emb is None:
-                    continue
-                nama, skor = pengenal.cocokkan(emb)
+                pelacak.bersihkan(t_proses)
 
-                if nama == "Unknown" and jalur["nama"] not in (None, "Unknown"):
-                    skor_tahan = pengenal.skor_untuk(emb, jalur["nama"])
-                    if skor_tahan >= config.THRESHOLD_TAHAN:
-                        nama, skor = jalur["nama"], skor_tahan
+                for nama in list(hitung_nama):
+                    if nama not in dikenali:
+                        hitung_nama[nama] = 0
+                for nama in dikenali:
+                    hitung_nama[nama] = hitung_nama.get(nama, 0) + 1
+                    if hitung_nama[nama] == config.FRAME_KONFIRMASI:
+                        if attendance.catat(nama):
+                            pesan, waktu_pesan = f"Absen tercatat: {nama}", time.time()
+                            alarm.umumkan_absen(nama)
+                            notifikasi.kirim_absen(nama)
 
-                jalur["riwayat"].append(nama)
-                stabil = Pelacak.nama_stabil(jalur)
-                if stabil is not None:
-                    jalur["nama"] = stabil
+                if ada_unknown:
+                    if unknown_sejak is None:
+                        unknown_sejak = t_proses
+                    unknown_terakhir = t_proses
+                elif (
+                    unknown_sejak is not None
+                    and t_proses - unknown_terakhir > config.TOLERANSI_UNKNOWN
+                ):
+                    unknown_sejak = None
 
-                if stabil is None:
-                    tampilan.append((kotak, "Memverifikasi", KUNING))
-                elif stabil == "Unknown":
-                    ada_unknown = True
-                    tampilan.append((kotak, f"Unknown {skor:.2f}", MERAH))
-                else:
-                    dikenali.add(stabil)
-                    tampilan.append((kotak, f"{stabil} {skor:.2f}", HIJAU))
+                if (
+                    unknown_sejak is not None
+                    and t_proses - unknown_sejak >= config.DURASI_UNKNOWN
+                ):
+                    if alarm.bunyikan():
+                        pesan, waktu_pesan = (
+                            "PERINGATAN: orang tidak dikenal!",
+                            time.time(),
+                        )
+                        attendance.catat_asing()
+                        notifikasi.kirim_asing()
 
-            pelacak.bersihkan(t_proses)
+            nomor += 1
 
-            for nama in list(hitung_nama):
-                if nama not in dikenali:
-                    hitung_nama[nama] = 0
-            for nama in dikenali:
-                hitung_nama[nama] = hitung_nama.get(nama, 0) + 1
-                if hitung_nama[nama] == config.FRAME_KONFIRMASI:
-                    if attendance.catat(nama):
-                        pesan, waktu_pesan = f"Absen tercatat: {nama}", time.time()
-                        alarm.umumkan_absen(nama)
-                        notifikasi.kirim_absen(nama)
+            for (x1, y1, x2, y2), teks, warna in tampilan:
+                cv2.rectangle(frame, (x1, y1), (x2, y2), warna, 2)
+                cv2.putText(
+                    frame,
+                    teks,
+                    (x1, max(y1 - 8, 20)),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    warna,
+                    2,
+                )
 
-            if ada_unknown:
-                if unknown_sejak is None:
-                    unknown_sejak = t_proses
-                unknown_terakhir = t_proses
-            elif unknown_sejak is not None and t_proses - unknown_terakhir > config.TOLERANSI_UNKNOWN:
-                unknown_sejak = None
+            sekarang = time.time()
+            fps = 0.9 * fps + 0.1 * (1 / max(sekarang - t_lalu, 1e-6))
+            t_lalu = sekarang
+            cv2.putText(
+                frame,
+                f"FPS: {fps:.1f}",
+                (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.8,
+                PUTIH,
+                2,
+            )
+            if pesan and sekarang - waktu_pesan < 4:
+                cv2.putText(
+                    frame,
+                    pesan,
+                    (10, 65),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.8,
+                    KUNING,
+                    2,
+                )
 
-            if unknown_sejak is not None and t_proses - unknown_sejak >= config.DURASI_UNKNOWN:
-                if alarm.bunyikan():
-                    pesan, waktu_pesan = "PERINGATAN: orang tidak dikenal!", time.time()
-                    attendance.catat_asing()
-                    notifikasi.kirim_asing()
+            _simpan_jpeg(frame)
+            time.sleep(0.01)
 
-        nomor += 1
-
-        for (x1, y1, x2, y2), teks, warna in tampilan:
-            cv2.rectangle(frame, (x1, y1), (x2, y2), warna, 2)
-            cv2.putText(frame, teks, (x1, max(y1 - 8, 20)),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, warna, 2)
-
-        sekarang = time.time()
-        fps = 0.9 * fps + 0.1 * (1 / max(sekarang - t_lalu, 1e-6))
-        t_lalu = sekarang
-        cv2.putText(frame, f"FPS: {fps:.1f}", (10, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, PUTIH, 2)
-        if pesan and sekarang - waktu_pesan < 4:
-            cv2.putText(frame, pesan, (10, 65),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, KUNING, 2)
-
-        _simpan_jpeg(frame)
-        time.sleep(0.01)
+    except Exception as e:
+        _set_pesan(f"Error kamera/model: {e}")
+        with _lock:
+            _mode = "idle"
+            _latest_jpeg = _buat_frame_placeholder(f"Error: {str(e)[:45]}")
+    finally:
+        _tutup_kamera()
 
 
 def _proses_pendaftaran(nama, target_sampel=7, batas_detik=15):
@@ -242,8 +312,15 @@ def _proses_pendaftaran(nama, target_sampel=7, batas_detik=15):
             elif len(deteksi) > 1:
                 pesan_layar = "Pastikan hanya 1 wajah di kamera"
 
-            cv2.putText(frame, pesan_layar, (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.75, PUTIH, 2)
+            cv2.putText(
+                frame,
+                pesan_layar,
+                (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.75,
+                PUTIH,
+                2,
+            )
             _simpan_jpeg(frame)
             time.sleep(0.08)
 
@@ -263,13 +340,15 @@ def _proses_pendaftaran(nama, target_sampel=7, batas_detik=15):
                     "ok": True,
                     "pesan": f"Berhasil mendaftarkan {len(sampel)} sampel wajah untuk '{nama}'.",
                 }
+            _set_pesan(f"Wajah '{nama}' berhasil didaftarkan.")
         else:
             with _lock:
                 _status_daftar = {
                     "aktif": False,
                     "ok": False,
-                    "pesan": f"Gagal: baru mendapat {len(sampel)}/{target_sampel} sampel. Coba lagi dengan pencahayaan cukup.",
+                    "pesan": f"Gagal: baru mendapat {len(sampel)}/{target_sampel} sampel. Coba lagi.",
                 }
+            _set_pesan("Pendaftaran belum cukup sampel.")
     except Exception as e:
         with _lock:
             _status_daftar = {
@@ -277,6 +356,7 @@ def _proses_pendaftaran(nama, target_sampel=7, batas_detik=15):
                 "ok": False,
                 "pesan": f"Kesalahan saat pendaftaran: {e}",
             }
+        _set_pesan(f"Error pendaftaran: {e}")
     finally:
         with _lock:
             _mode = "idle"
@@ -295,18 +375,23 @@ def beranda():
 @app.route("/api/frame")
 def api_frame():
     with _lock:
-        data = _latest_jpeg
-    if not data:
-        return ("", 204)
-    return send_file(
-        io.BytesIO(data) if "io" in sys.modules else __import__("io").BytesIO(data),
+        data = _latest_jpeg or _PLACEHOLDER_JPEG
+    return Response(
+        io.BytesIO(data).getvalue(),
         mimetype="image/jpeg",
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
     )
+
+
+@app.route("/api/status")
+def api_status():
+    with _lock:
+        return jsonify({"mode": _mode, "message": _pesan_sistem})
 
 
 @app.route("/api/mode", methods=["POST"])
 def api_mode():
-    global _mode, _worker_thread
+    global _mode, _worker_thread, _latest_jpeg
     payload = request.get_json(silent=True) or {}
     mode_baru = payload.get("mode", "idle")
 
@@ -317,21 +402,26 @@ def api_mode():
         if _mode == "daftar":
             return jsonify({"ok": False, "message": "Tunggu pendaftaran wajah selesai dulu."}), 409
         _mode = mode_baru
+        if mode_baru == "absensi":
+            _latest_jpeg = _buat_frame_placeholder("Memulai kamera & model wajah...")
 
     if mode_baru == "idle":
         _tutup_kamera()
+        with _lock:
+            _latest_jpeg = None
+        _set_pesan("Kamera dihentikan.")
         return jsonify({"ok": True, "message": "Kamera dihentikan."})
 
     if _worker_thread is None or not _worker_thread.is_alive():
         _worker_thread = threading.Thread(target=_loop_absensi, daemon=True)
         _worker_thread.start()
 
-    return jsonify({"ok": True, "message": "Mode absensi & keamanan aktif."})
+    return jsonify({"ok": True, "message": "Memulai mode absensi & keamanan..."})
 
 
 @app.route("/api/register", methods=["POST"])
 def api_register():
-    global _mode, _status_daftar
+    global _mode, _status_daftar, _latest_jpeg
     payload = request.get_json(silent=True) or {}
     nama = (payload.get("nama") or "").strip()
     if not nama:
@@ -341,6 +431,7 @@ def api_register():
         if _mode == "daftar":
             return jsonify({"ok": False, "message": "Pendaftaran sedang berjalan."}), 409
         _mode = "daftar"
+        _latest_jpeg = _buat_frame_placeholder(f"Menyiapkan daftar: {nama}...")
         _status_daftar = {
             "aktif": True,
             "ok": False,
@@ -348,7 +439,7 @@ def api_register():
         }
 
     threading.Thread(target=_proses_pendaftaran, args=(nama,), daemon=True).start()
-    return jsonify({"ok": True, "message": f"Pendaftaran '{nama}' dimulai. Arahkan wajah ke kamera."})
+    return jsonify({"ok": True, "message": f"Pendaftaran '{nama}' dimulai."})
 
 
 @app.route("/api/register-status")
