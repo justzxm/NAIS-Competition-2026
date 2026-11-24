@@ -1,5 +1,12 @@
-models/
+# folder tetap ada di repo, isinya diabaikan
+data/*
+!data/.gitkeep
+models/*
+!models/.gitkeep
+
+# rahasia dan lingkungan lokal
+.env
+.venv/
+
 __pycache__/
 *.pyc
-data/
-.env/
