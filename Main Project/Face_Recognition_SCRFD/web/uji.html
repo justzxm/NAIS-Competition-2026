@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Uji Skor & Grafik — Face Recognition</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #f1f5f9;
+      --surface: #ffffff;
+      --surface-2: #f8fafc;
+      --surface-3: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --accent-soft: #eff6ff;
+      --danger: #dc2626;
+      --danger-soft: #fef2f2;
+      --success: #059669;
+      --success-soft: #ecfdf5;
+      --radius-lg: 18px;
+      --radius-md: 12px;
+      --radius-sm: 9px;
+      --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.04);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 22px 18px 48px;
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    .app { max-width: 1240px; margin: 0 auto; }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+      padding: 15px 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .topbar-left { display: flex; align-items: center; gap: 14px; }
+
+    .burger-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      display: inline-flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 4.5px;
+      cursor: pointer;
+    }
+    .burger-btn span { width: 16px; height: 1.8px; background: var(--text); border-radius: 2px; }
+
+    .brand h1 { margin: 0; font-size: 18.5px; font-weight: 700; }
+    .brand p { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
+
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+      gap: 20px;
+      align-items: start;
+    }
+
+    .col { display: flex; flex-direction: column; gap: 20px; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .card-title { margin: 0; font-size: 15.5px; font-weight: 650; }
+    .card-meta { font-size: 12px; color: var(--muted); }
+
+    .btn {
+      appearance: none;
+      padding: 9px 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-accent { background: var(--accent); color: #fff; }
+    .btn-accent:hover:not(:disabled) { background: var(--accent-hover); }
+    .btn-danger { background: var(--surface); color: var(--danger); border-color: #fecaca; }
+    .btn-secondary { background: var(--surface-2); color: var(--text); border-color: var(--border); }
+    .btn-sm { padding: 6px 11px; font-size: 12px; border-radius: 7px; }
+
+    .form-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+
+    .input {
+      flex: 1;
+      min-width: 180px;
+      padding: 9px 12px;
+      font-size: 13.5px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      outline: none;
+    }
+    .input:focus { border-color: var(--accent); }
+
+    .viewport {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #0b1120;
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      border: 1px solid #1e293b;
+      margin-bottom: 12px;
+    }
+    #camera-view { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+    .live-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .metric-box {
+      padding: 10px 12px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+    }
+    .metric-box span { display: block; font-size: 11.5px; color: var(--muted); }
+    .metric-box strong { font-size: 16px; }
+
+    .status-box {
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      font-size: 12.5px;
+      color: var(--muted);
+    }
+
+    .chart-wrap { position: relative; height: 260px; width: 100%; }
+
+    .table-box {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      max-height: 250px;
+      overflow: auto;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    th { position: sticky; top: 0; background: var(--surface-2); color: var(--muted); font-size: 11px; text-transform: uppercase; }
+
+    .drawer-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.36); z-index: 60; opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
+    .drawer-backdrop.is-open { opacity: 1; pointer-events: auto; }
+    .drawer { position: fixed; top: 0; left: 0; bottom: 0; width: 310px; max-width: 88vw; background: var(--surface); border-right: 1px solid var(--border); z-index: 70; transform: translateX(-100%); transition: transform 0.22s ease; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+    .drawer.is-open { transform: translateX(0); }
+    .drawer-head { display: flex; justify-content: space-between; align-items: center; }
+    .drawer-head h2 { margin: 0; font-size: 16px; }
+    .nav-stack { display: flex; flex-direction: column; gap: 8px; }
+    .nav-link { padding: 10px 12px; border-radius: var(--radius-sm); text-decoration: none; color: var(--text); font-size: 13.5px; font-weight: 600; background: var(--surface-2); border: 1px solid var(--border); }
+    .nav-link.is-here { background: var(--accent-soft); border-color: #bfdbfe; color: #1e40af; }
+
+    @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div id="drawer-backdrop" class="drawer-backdrop" onclick="toggleDrawer(false)"></div>
+  <aside id="nav-drawer" class="drawer">
+    <div class="drawer-head">
+      <h2>Halaman</h2>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="toggleDrawer(false)">Tutup</button>
+    </div>
+    <nav class="nav-stack">
+      <a class="nav-link" href="/">Kamera &amp; Registrasi</a>
+      <a class="nav-link is-here" href="/uji">Uji Skor &amp; Grafik</a>
+      <a class="nav-link" href="/log">Log Kehadiran &amp; CSV</a>
+      <a class="nav-link" href="/pengaturan">Pengaturan &amp; Info</a>
+    </nav>
+  </aside>
+
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button type="button" class="burger-btn" aria-label="Buka menu" onclick="toggleDrawer(true)">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="brand">
+          <h1>Pengujian Skor Wajah &amp; Grafik</h1>
+          <p>Uji kemiripan ArcFace untuk wajah terdaftar atau asing dan visualisasikan hasilnya</p>
+        </div>
+      </div>
+      <a class="btn btn-secondary btn-sm" href="/">Kembali ke Kamera</a>
+    </header>
+
+    <main class="grid">
+      <div class="col">
+        <section class="card">
+          <div class="card-head">
+            <h2 class="card-title">Sesi Uji Langsung</h2>
+            <span id="thr-label" class="card-meta">THRESHOLD: -</span>
+          </div>
+
+          <form class="form-row" onsubmit="mulaiUji(event)">
+            <input
+              type="text"
+              id="label-uji"
+              class="input"
+              list="daftar-nama-db"
+              placeholder="Nama terdaftar atau label penguji asing"
+              required
+            />
+            <datalist id="daftar-nama-db"></datalist>
+            <button id="btn-mulai-uji" type="submit" class="btn btn-accent">Mulai Uji</button>
+            <button id="btn-stop-uji" type="button" class="btn btn-danger" onclick="stopUji()" disabled>Selesai &amp; Simpan</button>
+          </form>
+
+          <div class="viewport">
+            <img id="camera-view" src="/api/frame" alt="Kamera sesi uji" />
+          </div>
+
+          <div class="live-metrics">
+            <div class="metric-box"><span>Pengukuran</span><strong id="m-count">0</strong></div>
+            <div class="metric-box"><span>Skor Terakhir</span><strong id="m-last">-</strong></div>
+            <div class="metric-box"><span>Tipe Label</span><strong id="m-type">-</strong></div>
+          </div>
+
+          <div id="uji-status" class="status-box">
+            Masukkan nama yang ada di database (untuk uji terdaftar) atau nama lain (untuk uji orang asing).
+          </div>
+        </section>
+      </div>
+
+      <div class="col">
+        <section class="card">
+          <div class="card-head">
+            <h2 class="card-title">Grafik Tren Skor Sesi Aktif / Terakhir</h2>
+            <span class="card-meta">Skor kosinus</span>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="chart-skor"></canvas>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-head">
+            <h2 class="card-title">Grafik Ringkasan Sesi (hasil_uji.csv)</h2>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="muatHasilUji()">Refresh</button>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="chart-ringkasan"></canvas>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-head">
+            <h2 class="card-title">Riwayat Hasil Uji</h2>
+            <span id="count-uji" class="card-meta">0 sesi</span>
+          </div>
+          <div class="table-box">
+            <table>
+              <thead>
+                <tr>
+                  <th>Waktu</th>
+                  <th>Label</th>
+                  <th>Jenis</th>
+                  <th>n</th>
+                  <th>Min</th>
+                  <th>Rata2</th>
+                  <th>Maks</th>
+                  <th>Lolos %</th>
+                </tr>
+              </thead>
+              <tbody id="body-uji">
+                <tr><td colspan="8" class="card-meta">Belum ada data hasil_uji.csv</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    let frameTimer = null;
+    let pollTimer = null;
+    let chartSkor = null;
+    let chartRingkasan = null;
+    let thresholdVal = 0.4;
+
+    function toggleDrawer(open) {
+      const d = document.getElementById("nav-drawer");
+      const b = document.getElementById("drawer-backdrop");
+      const next = typeof open === "boolean" ? open : !d.classList.contains("is-open");
+      d.classList.toggle("is-open", next);
+      b.classList.toggle("is-open", next);
+    }
+
+    function initCharts() {
+      const ctx1 = document.getElementById("chart-skor").getContext("2d");
+      chartSkor = new Chart(ctx1, {
+        type: "line",
+        data: {
+          labels: [],
+          datasets: [{
+            label: "Skor Kemiripan",
+            data: [],
+            borderColor: "#2563eb",
+            backgroundColor: "rgba(37, 99, 235, 0.12)",
+            tension: 0.25,
+            pointRadius: 2,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: { y: { min: 0, max: 1 } }
+        }
+      });
+
+      const ctx2 = document.getElementById("chart-ringkasan").getContext("2d");
+      chartRingkasan = new Chart(ctx2, {
+        type: "bar",
+        data: {
+          labels: [],
+          datasets: [
+            { label: "Rata-rata", data: [], backgroundColor: "#2563eb" },
+            { label: "Min", data: [], backgroundColor: "#94a3b8" },
+            { label: "Maks", data: [], backgroundColor: "#059669" }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: { y: { min: 0, max: 1 } }
+        }
+      });
+    }
+
+    async function muatPengguna() {
+      try {
+        const res = await fetch("/api/pengguna");
+        if (!res.ok) return;
+        const data = await res.json();
+        thresholdVal = data.threshold ?? 0.4;
+        document.getElementById("thr-label").textContent = `THRESHOLD: ${thresholdVal}`;
+        const dl = document.getElementById("daftar-nama-db");
+        dl.innerHTML = (data.pengguna || []).map(p => `<option value="${p.nama}"></option>`).join("");
+      } catch (_) {}
+    }
+
+    async function mulaiUji(e) {
+      e.preventDefault();
+      const label = document.getElementById("label-uji").value.trim();
+      if (!label) return;
+
+      const res = await fetch("/api/uji/mulai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label })
+      });
+      const data = await res.json();
+      document.getElementById("uji-status").textContent = data.message || "";
+      if (res.ok) {
+        document.getElementById("btn-mulai-uji").disabled = true;
+        document.getElementById("btn-stop-uji").disabled = false;
+        if (frameTimer) clearInterval(frameTimer);
+        frameTimer = setInterval(() => {
+          document.getElementById("camera-view").src = "/api/frame?t=" + Date.now();
+        }, 160);
+        if (pollTimer) clearInterval(pollTimer);
+        pollTimer = setInterval(pollUji, 500);
+      }
+    }
+
+    async function stopUji() {
+      await fetch("/api/uji/stop", { method: "POST" });
+      document.getElementById("btn-stop-uji").disabled = true;
+    }
+
+    async function pollUji() {
+      try {
+        const res = await fetch("/api/uji/status");
+        if (!res.ok) return;
+        const st = await res.json();
+
+        document.getElementById("m-count").textContent = st.jumlah ?? 0;
+        document.getElementById("m-last").textContent = st.terakhir !== null ? Number(st.terakhir).toFixed(3) : "-";
+        document.getElementById("m-type").textContent = st.label ? (st.terdaftar ? "Terdaftar" : "Asing") : "-";
+        document.getElementById("uji-status").textContent = st.pesan || "";
+
+        const scores = st.skor_list || [];
+        chartSkor.data.labels = scores.map((_, idx) => `#${idx + 1}`);
+        chartSkor.data.datasets[0].data = scores;
+        chartSkor.update("none");
+
+        if (!st.aktif) {
+          clearInterval(pollTimer);
+          pollTimer = null;
+          if (frameTimer) { clearInterval(frameTimer); frameTimer = null; }
+          document.getElementById("btn-mulai-uji").disabled = false;
+          document.getElementById("btn-stop-uji").disabled = true;
+          muatHasilUji();
+        }
+      } catch (_) {}
+    }
+
+    async function muatHasilUji() {
+      try {
+        const res = await fetch("/api/uji/hasil");
+        if (!res.ok) return;
+        const data = await res.json();
+        const rows = data.rows || [];
+        document.getElementById("count-uji").textContent = `${rows.length} sesi`;
+
+        const recent = rows.slice(-8);
+        chartRingkasan.data.labels = recent.map(r => `${r.label} (${r.jenis === "terdaftar" ? "Reg" : "Asing"})`);
+        chartRingkasan.data.datasets[0].data = recent.map(r => Number(r.rata2 || 0));
+        chartRingkasan.data.datasets[1].data = recent.map(r => Number(r.min || 0));
+        chartRingkasan.data.datasets[2].data = recent.map(r => Number(r.maks || 0));
+        chartRingkasan.update();
+
+        const tbody = document.getElementById("body-uji");
+        if (!rows.length) {
+          tbody.innerHTML = `<tr><td colspan="8" class="card-meta">Belum ada data hasil_uji.csv</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = rows.slice(-15).reverse().map(r => `
+          <tr>
+            <td>${r.waktu ?? ""}</td>
+            <td><strong>${r.label ?? ""}</strong></td>
+            <td>${r.jenis ?? ""}</td>
+            <td>${r.jumlah ?? ""}</td>
+            <td>${r.min ?? ""}</td>
+            <td>${r.rata2 ?? ""}</td>
+            <td>${r.maks ?? ""}</td>
+            <td>${r.persen_lolos ?? ""}%</td>
+          </tr>
+        `).join("");
+      } catch (_) {}
+    }
+
+    initCharts();
+    muatPengguna();
+    muatHasilUji();
+    pollUji();
+  </script>
+</body>
+</html>
