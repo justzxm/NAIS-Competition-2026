@@ -44,7 +44,6 @@ _lock = threading.Lock()
 _mode = "idle"  # "idle" | "absensi" | "daftar" | "uji"
 _kamera = None
 _detektor = None
-_latest_jpeg = None
 _pesan_sistem = "Siap"
 _status_daftar = {"aktif": False, "pesan": "Belum ada pendaftaran berjalan.", "ok": False}
 _status_uji = {
@@ -67,7 +66,7 @@ def _buat_frame_placeholder(teks="Menyiapkan kamera..."):
         teks,
         (30, 185),
         cv2.FONT_HERSHEY_SIMPLEX,
-        0.75,
+        0.72,
         (229, 231, 235),
         2,
     )
@@ -75,7 +74,9 @@ def _buat_frame_placeholder(teks="Menyiapkan kamera..."):
     return buf.tobytes() if ok else b""
 
 
-_PLACEHOLDER_JPEG = _buat_frame_placeholder()
+_PLACEHOLDER_JPEG = _buat_frame_placeholder("Menyiapkan kamera...")
+_STOPPED_JPEG = _buat_frame_placeholder("Kamera dihentikan (Mode Siaga)")
+_latest_jpeg = _STOPPED_JPEG
 
 
 def _set_pesan(teks):
@@ -115,7 +116,8 @@ def _simpan_jpeg(frame):
     ok, buf = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
     if ok:
         with _lock:
-            _latest_jpeg = buf.tobytes()
+            if _mode != "idle":
+                _latest_jpeg = buf.tobytes()
 
 
 def _nilai_hidup(kedipan, kotak, jalur, t):
@@ -134,7 +136,7 @@ def _nilai_hidup(kedipan, kotak, jalur, t):
 
 
 def _loop_absensi():
-    global _mode
+    global _mode, _latest_jpeg
     try:
         kamera = _buka_kamera()
         detektor = _get_detektor()
@@ -323,10 +325,13 @@ def _loop_absensi():
             _latest_jpeg = _buat_frame_placeholder(f"Error: {str(e)[:45]}")
     finally:
         _tutup_kamera()
+        with _lock:
+            if _mode == "idle":
+                _latest_jpeg = _STOPPED_JPEG
 
 
 def _proses_pendaftaran(nama, target_sampel=7, batas_detik=15):
-    global _mode, _status_daftar
+    global _mode, _status_daftar, _latest_jpeg
     sampel = []
     mulai = time.time()
 
@@ -412,6 +417,7 @@ def _proses_pendaftaran(nama, target_sampel=7, batas_detik=15):
     finally:
         with _lock:
             _mode = "idle"
+            _latest_jpeg = _STOPPED_JPEG
         _tutup_kamera()
 
 
@@ -454,7 +460,7 @@ def _simpan_ringkasan_uji(label, terdaftar, skor_list):
 
 
 def _loop_uji(label, terdaftar):
-    global _mode, _status_uji
+    global _mode, _status_uji, _latest_jpeg
     skor_list = []
     nomor = 0
 
@@ -548,6 +554,7 @@ def _loop_uji(label, terdaftar):
         ringkasan_data = _simpan_ringkasan_uji(label, terdaftar, skor_list)
         with _lock:
             _mode = "idle"
+            _latest_jpeg = _STOPPED_JPEG
             _status_uji["aktif"] = False
             if ringkasan_data:
                 _status_uji["pesan"] = (
@@ -591,11 +598,18 @@ def halaman_pengaturan():
 @app.route("/api/frame")
 def api_frame():
     with _lock:
-        data = _latest_jpeg or _PLACEHOLDER_JPEG
+        mode_saat_ini = _mode
+        data = _latest_jpeg
+    if data is None:
+        data = _STOPPED_JPEG if mode_saat_ini == "idle" else _PLACEHOLDER_JPEG
     return Response(
         io.BytesIO(data).getvalue(),
         mimetype="image/jpeg",
-        headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
     )
 
 
@@ -619,12 +633,14 @@ def api_mode():
             return jsonify({"ok": False, "message": f"Selesaikan mode '{_mode}' terlebih dahulu."}), 409
         _mode = mode_baru
         if mode_baru == "absensi":
-            _latest_jpeg = _buat_frame_placeholder("Memulai kamera & model wajah...")
+            _latest_jpeg = _PLACEHOLDER_JPEG
+        else:
+            _latest_jpeg = _STOPPED_JPEG
 
     if mode_baru == "idle":
         _tutup_kamera()
         with _lock:
-            _latest_jpeg = None
+            _latest_jpeg = _STOPPED_JPEG
         _set_pesan("Kamera dihentikan.")
         return jsonify({"ok": True, "message": "Kamera dihentikan."})
 
@@ -647,7 +663,7 @@ def api_register():
         if _mode != "idle":
             return jsonify({"ok": False, "message": f"Sistem sedang dalam mode '{_mode}'."}), 409
         _mode = "daftar"
-        _latest_jpeg = _buat_frame_placeholder(f"Menyiapkan daftar: {nama}...")
+        _latest_jpeg = _PLACEHOLDER_JPEG
         _status_daftar = {
             "aktif": True,
             "ok": False,
@@ -696,7 +712,7 @@ def api_uji_mulai():
         if _mode != "idle":
             return jsonify({"ok": False, "message": f"Sistem sedang dalam mode '{_mode}'."}), 409
         _mode = "uji"
-        _latest_jpeg = _buat_frame_placeholder(f"Menyiapkan uji: {label}...")
+        _latest_jpeg = _PLACEHOLDER_JPEG
         _status_uji = {
             "aktif": True,
             "label": label,

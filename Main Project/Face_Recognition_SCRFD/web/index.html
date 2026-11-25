@@ -402,7 +402,7 @@
           <img id="camera-view" src="/api/frame" alt="Pratinjau kamera" />
           <div class="viewport-bar">
             <span id="overlay-mode" class="overlay-box">Mode: Siaga</span>
-            <span class="overlay-box">Hadap depan &amp; berkedip alami</span>
+            <span id="overlay-hint" class="overlay-box">Kamera nonaktif</span>
           </div>
         </div>
 
@@ -465,7 +465,7 @@
   <script>
     let frameTimer = null;
     let regPollTimer = null;
-    let currentMode = "idle";
+    let currentMode = null;
     const frameIntervalMs = Number(localStorage.getItem("ui_frame_ms") || 160);
 
     if (localStorage.getItem("ui_show_guide") === "false") {
@@ -501,6 +501,7 @@
       const pill = document.getElementById("mode-pill");
       const modeText = document.getElementById("mode-text");
       const overlayMode = document.getElementById("overlay-mode");
+      const overlayHint = document.getElementById("overlay-hint");
       const viewport = document.getElementById("viewport");
       const btnStart = document.getElementById("btn-start");
       const btnStop = document.getElementById("btn-stop");
@@ -516,6 +517,7 @@
         viewport.classList.add("is-live");
         modeText.textContent = "Absensi Aktif";
         overlayMode.textContent = "Mode: Absensi & Anti-Spoofing";
+        overlayHint.textContent = "Hadap depan & berkedip alami";
         btnStart.textContent = "Absensi Berjalan";
         btnStart.classList.add("is-running");
         btnStart.disabled = true;
@@ -527,6 +529,7 @@
         viewport.classList.add("is-reg");
         modeText.textContent = "Registrasi Wajah";
         overlayMode.textContent = "Mode: Registrasi Wajah";
+        overlayHint.textContent = "Hadap depan & cukup dekat";
         btnStart.textContent = "Mulai Absensi";
         btnStart.disabled = true;
         btnStop.disabled = true;
@@ -535,6 +538,7 @@
       } else {
         modeText.textContent = "Siaga";
         overlayMode.textContent = "Mode: Siaga";
+        overlayHint.textContent = "Kamera nonaktif";
         btnStart.textContent = "Mulai Absensi";
         btnStart.disabled = false;
         btnStop.disabled = true;
@@ -543,22 +547,40 @@
       }
     }
 
-    function refreshFrame() {
-      document.getElementById("camera-view").src = "/api/frame?t=" + Date.now();
+    function refreshFrame(tag = "t") {
+      const img = document.getElementById("camera-view");
+      img.src = `/api/frame?${tag}=` + Date.now();
     }
 
     function startFrameLoop() {
-      if (frameTimer) clearInterval(frameTimer);
-      refreshFrame();
-      frameTimer = setInterval(refreshFrame, frameIntervalMs);
+      if (frameTimer !== null) {
+        clearInterval(frameTimer);
+        frameTimer = null;
+      }
+      refreshFrame("t");
+      frameTimer = setInterval(() => {
+        if (currentMode === "absensi" || currentMode === "daftar") {
+          refreshFrame("t");
+        }
+      }, frameIntervalMs);
     }
 
     function stopFrameLoop() {
-      if (frameTimer) { clearInterval(frameTimer); frameTimer = null; }
-      refreshFrame();
+      if (frameTimer !== null) {
+        clearInterval(frameTimer);
+        frameTimer = null;
+      }
+      refreshFrame("stopped");
     }
 
     async function setMode(mode) {
+      if (mode === "idle") {
+        // Hentikan loop di sisi klien segera agar frame terakhir tidak terus di-refresh
+        if (frameTimer !== null) {
+          clearInterval(frameTimer);
+          frameTimer = null;
+        }
+      }
       try {
         const res = await fetch("/api/mode", {
           method: "POST",
@@ -580,6 +602,10 @@
           showToast(data.message || "Gagal mengubah mode", "error");
         }
       } catch (err) {
+        if (mode === "idle") {
+          applyModeUI("idle");
+          stopFrameLoop();
+        }
         showToast("Error: " + err.message, "error");
       }
     }
@@ -656,6 +682,7 @@
           el.classList.add("err");
           wrap.classList.remove("is-visible");
           applyModeUI("idle");
+          stopFrameLoop();
           showToast(data.message || "Gagal", "error");
           return;
         }
@@ -666,6 +693,7 @@
         el.classList.add("err");
         wrap.classList.remove("is-visible");
         applyModeUI("idle");
+        stopFrameLoop();
       }
     }
 
